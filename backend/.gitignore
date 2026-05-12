@@ -1,0 +1,37 @@
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Logs
+logs/
+*.log
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Proyecto específico
+*.pdf
+*.docx
+*.doc
+node_modules/

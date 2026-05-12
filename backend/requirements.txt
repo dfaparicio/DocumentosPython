@@ -1,0 +1,33 @@
+# Framework web para la API
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# Validación de datos
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Procesamiento de PDF a imagen
+pymupdf==1.23.8
+
+# Procesamiento de imágenes (Pillow)
+Pillow>=10.0.0
+
+# Motor de IA para extraer datos
+google-generativeai>=0.8.0
+
+# Generación de Excel
+pandas==2.2.0
+openpyxl==3.1.2
+
+# Manejo de variables de entorno
+python-dotenv==1.0.0
+
+# Manejo de archivos
+python-multipart==0.0.6
+
+# Nuevas librerías para refactorización
+aiohttp==3.9.1
+tenacity==8.2.3
+cachetools==5.3.2
+python-docx==1.1.0
+python-magic==0.4.27
