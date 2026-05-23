@@ -1,6 +1,9 @@
 """
 Divisor de imágenes para páginas mixtas.
 Divide una imagen que contiene dos caras de un documento en dos imágenes separadas.
+
+Image splitter for mixed pages.
+Splits an image containing two faces of a document into two separate images.
 """
 
 import io
@@ -22,19 +25,36 @@ def split_image_by_coordinates(image_bytes: bytes, coordinates: Dict[str, Dict[s
 
     Returns:
         Tupla (cara_1, cara_2) con las dos imágenes en bytes, o None si falla
+
+    Splits an image in two using the specified coordinates.
+
+    Args:
+        image_bytes: The original image in bytes format
+        coordinates: Dictionary with coordinates for cara_1 and cara_2
+            Example: {
+                "cara_1": {"y_inicio": 0, "y_fin": 500, "x_inicio": 0, "x_fin": 1000},
+                "cara_2": {"y_inicio": 500, "y_fin": 1000, "x_inicio": 0, "x_fin": 1000}
+            }
+
+    Returns:
+        Tuple (cara_1, cara_2) with the two images in bytes, or None if it fails
     """
     try:
         # Cargamos la imagen desde bytes
+        # Load the image from bytes
         image = Image.open(io.BytesIO(image_bytes))
 
         # Verificamos que la imagen esté en modo RGBA para mantener transparencia si existe
+        # Verify the image is in RGBA mode to preserve transparency if it exists
         if image.mode != 'RGBA':
             image = image.convert('RGBA')
 
         # Obtenemos las dimensiones
+        # Get the dimensions
         width, height = image.size
 
         # Extraemos cara 1
+        # Extract face 1
         coords1 = coordinates.get("cara_1", {})
         y1_start = int(coords1.get("y_inicio", 0))
         y1_end = int(coords1.get("y_fin", height // 2))
@@ -42,21 +62,25 @@ def split_image_by_coordinates(image_bytes: bytes, coordinates: Dict[str, Dict[s
         x1_end = int(coords1.get("x_fin", width))
 
         # Validamos y ajustamos las coordenadas
+        # Validate and adjust coordinates
         y1_start = max(0, min(y1_start, height))
         y1_end = max(y1_start, min(y1_end, height))
         x1_start = max(0, min(x1_start, width))
         x1_end = max(x1_start, min(x1_end, width))
 
         # Recortamos cara 1
+        # Crop face 1
         box1 = (x1_start, y1_start, x1_end, y1_end)
         cara1_image = image.crop(box1)
 
         # Convertimos a PNG en bytes
+        # Convert to PNG in bytes
         cara1_bytes = io.BytesIO()
         cara1_image.save(cara1_bytes, format='PNG')
         cara1_bytes = cara1_bytes.getvalue()
 
         # Extraemos cara 2
+        # Extract face 2
         coords2 = coordinates.get("cara_2", {})
         y2_start = int(coords2.get("y_inicio", height // 2))
         y2_end = int(coords2.get("y_fin", height))
@@ -64,16 +88,19 @@ def split_image_by_coordinates(image_bytes: bytes, coordinates: Dict[str, Dict[s
         x2_end = int(coords2.get("x_fin", width))
 
         # Validamos y ajustamos las coordenadas
+        # Validate and adjust coordinates
         y2_start = max(0, min(y2_start, height))
         y2_end = max(y2_start, min(y2_end, height))
         x2_start = max(0, min(x2_start, width))
         x2_end = max(x2_start, min(x2_end, width))
 
         # Recortamos cara 2
+        # Crop face 2
         box2 = (x2_start, y2_start, x2_end, y2_end)
         cara2_image = image.crop(box2)
 
         # Convertimos a PNG en bytes
+        # Convert to PNG in bytes
         cara2_bytes = io.BytesIO()
         cara2_image.save(cara2_bytes, format='PNG')
         cara2_bytes = cara2_bytes.getvalue()
@@ -95,26 +122,41 @@ def split_image_vertically(image_bytes: bytes, split_at: Optional[int] = None) -
 
     Returns:
         Tupla (parte_superior, parte_inferior) con las dos imágenes en bytes, o None si falla
+
+    Splits an image vertically into two equal parts (or at a specific position).
+
+    Args:
+        image_bytes: The original image in bytes format
+        split_at: Y position to split at (None to split in half)
+
+    Returns:
+        Tuple (top_part, bottom_part) with the two images in bytes, or None if it fails
     """
     try:
         # Cargamos la imagen desde bytes
+        # Load the image from bytes
         image = Image.open(io.BytesIO(image_bytes))
 
         # Verificamos que la imagen esté en modo RGBA
+        # Verify the image is in RGBA mode
         if image.mode != 'RGBA':
             image = image.convert('RGBA')
 
         # Obtenemos las dimensiones
+        # Get the dimensions
         width, height = image.size
 
         # Determinamos el punto de división
+        # Determine the split point
         if split_at is None:
             split_at = height // 2
         else:
             split_at = max(0, min(split_at, height))
 
         # Dividimos verticalmente (arriba y abajo)
+        # Split vertically (top and bottom)
         # Parte superior
+        # Top part
         box_top = (0, 0, width, split_at)
         top_image = image.crop(box_top)
 
@@ -123,6 +165,7 @@ def split_image_vertically(image_bytes: bytes, split_at: Optional[int] = None) -
         top_bytes = top_bytes.getvalue()
 
         # Parte inferior
+        # Bottom part
         box_bottom = (0, split_at, width, height)
         bottom_image = image.crop(box_bottom)
 
@@ -147,26 +190,41 @@ def split_image_horizontally(image_bytes: bytes, split_at: Optional[int] = None)
 
     Returns:
         Tupla (parte_izquierda, parte_derecha) con las dos imágenes en bytes, o None si falla
+
+    Splits an image horizontally into two equal parts (or at a specific position).
+
+    Args:
+        image_bytes: The original image in bytes format
+        split_at: X position to split at (None to split in half)
+
+    Returns:
+        Tuple (left_part, right_part) with the two images in bytes, or None if it fails
     """
     try:
         # Cargamos la imagen desde bytes
+        # Load the image from bytes
         image = Image.open(io.BytesIO(image_bytes))
 
         # Verificamos que la imagen esté en modo RGBA
+        # Verify the image is in RGBA mode
         if image.mode != 'RGBA':
             image = image.convert('RGBA')
 
         # Obtenemos las dimensiones
+        # Get the dimensions
         width, height = image.size
 
         # Determinamos el punto de división
+        # Determine the split point
         if split_at is None:
             split_at = width // 2
         else:
             split_at = max(0, min(split_at, width))
 
         # Dividimos horizontalmente (izquierda y derecha)
+        # Split horizontally (left and right)
         # Parte izquierda
+        # Left part
         box_left = (0, 0, split_at, height)
         left_image = image.crop(box_left)
 
@@ -175,6 +233,7 @@ def split_image_horizontally(image_bytes: bytes, split_at: Optional[int] = None)
         left_bytes = left_bytes.getvalue()
 
         # Parte derecha
+        # Right part
         box_right = (split_at, 0, width, height)
         right_image = image.crop(box_right)
 
@@ -202,20 +261,36 @@ def crop_image(image_bytes: bytes, x: int, y: int, width: int, height: int) -> O
 
     Returns:
         La imagen recortada en bytes, o None si falla
+
+    Crops an image to the specified dimensions.
+
+    Args:
+        image_bytes: The original image in bytes format
+        x: Starting X coordinate
+        y: Starting Y coordinate
+        width: Width of the crop
+        height: Height of the crop
+
+    Returns:
+        The cropped image in bytes, or None if it fails
     """
     try:
         # Cargamos la imagen desde bytes
+        # Load the image from bytes
         image = Image.open(io.BytesIO(image_bytes))
 
         # Verificamos que la imagen esté en modo RGBA
+        # Verify the image is in RGBA mode
         if image.mode != 'RGBA':
             image = image.convert('RGBA')
 
         # Recortamos la imagen
+        # Crop the image
         box = (x, y, x + width, y + height)
         cropped_image = image.crop(box)
 
         # Convertimos a PNG en bytes
+        # Convert to PNG in bytes
         cropped_bytes = io.BytesIO()
         cropped_image.save(cropped_bytes, format='PNG')
         cropped_bytes = cropped_bytes.getvalue()

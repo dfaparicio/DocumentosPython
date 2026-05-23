@@ -1,6 +1,9 @@
 """
 Value Object para datos extraídos de un documento.
 Encapsula la estructura de datos extraídos de la IA.
+
+Value Object for data extracted from a document.
+Encapsulates the structure of data extracted by the AI.
 """
 
 from dataclasses import dataclass, field
@@ -11,25 +14,26 @@ from typing import Dict, Any, Optional
 class ExtractionData:
     """
     Datos extraídos de un documento.
+    Data extracted from a document.
 
     Attributes:
-        tipo_documento: Tipo de documento
-        numero_documento: Número de documento
-        nombres: Nombres completos
-        apellidos: Apellidos completos
-        fecha_nacimiento: Fecha de nacimiento
-        sexo: Sexo (M/F)
-        nacionalidad: Nacionalidad
-        fecha_expedicion: Fecha de expedición (opcional)
-        fecha_vencimiento: Fecha de vencimiento (opcional)
-        lugar_expedicion: Lugar de expedición (opcional)
-        lugar_nacimiento: Lugar de nacimiento (opcional)
-        huella_digital: Huella digital (opcional)
-        firma: Firma (opcional)
-        codigo_qr: Código QR (opcional)
-        datos_biometricos: Datos biométricos (opcional)
-        grupo_sanguineo: Grupo sanguíneo (opcional)
-        tipo_visa: Tipo de visa (opcional)
+        tipo_documento: Tipo de documento / Document type
+        numero_documento: Número de documento / Document number
+        nombres: Nombres completos / Full first names
+        apellidos: Apellidos completos / Full last names
+        fecha_nacimiento: Fecha de nacimiento / Date of birth
+        sexo: Sexo (M/F) / Sex (M/F)
+        nacionalidad: Nacionalidad / Nationality
+        fecha_expedicion: Fecha de expedición (opcional) / Issue date (optional)
+        fecha_vencimiento: Fecha de vencimiento (opcional) / Expiration date (optional)
+        lugar_expedicion: Lugar de expedición (opcional) / Place of issue (optional)
+        lugar_nacimiento: Lugar de nacimiento (opcional) / Place of birth (optional)
+        huella_digital: Huella digital (opcional) / Fingerprint (optional)
+        firma: Firma (opcional) / Signature (optional)
+        codigo_qr: Código QR (opcional) / QR code (optional)
+        datos_biometricos: Datos biométricos (opcional) / Biometric data (optional)
+        grupo_sanguineo: Grupo sanguíneo (opcional) / Blood type (optional)
+        tipo_visa: Tipo de visa (opcional) / Visa type (optional)
     """
 
     tipo_documento: str = ""
@@ -51,7 +55,8 @@ class ExtractionData:
     tipo_visa: str = ""
 
     def to_dict(self) -> Dict[str, str]:
-        """Convierte los datos a un diccionario."""
+        """Convierte los datos a un diccionario.
+        Converts the data to a dictionary."""
         return {
             "tipo_documento": self.tipo_documento,
             "numero_documento": self.numero_documento,
@@ -76,12 +81,13 @@ class ExtractionData:
     def from_dict(cls, data: Dict[str, Any]) -> "ExtractionData":
         """
         Crea una instancia desde un diccionario.
+        Creates an instance from a dictionary.
 
         Args:
-            data: Diccionario con los datos extraídos
+            data: Diccionario con los datos extraídos / Dictionary with the extracted data
 
         Returns:
-            Instancia de ExtractionData
+            Instancia de ExtractionData / ExtractionData instance
         """
         return cls(
             tipo_documento=str(data.get("tipo_documento", "")),
@@ -106,9 +112,10 @@ class ExtractionData:
     def is_empty(self) -> bool:
         """
         Verifica si los datos están vacíos.
+        Checks if the data is empty.
 
         Returns:
-            True si todos los campos principales están vacíos
+            True si todos los campos principales están vacíos / True if all main fields are empty
         """
         return not any([
             self.numero_documento.strip(),
@@ -119,9 +126,10 @@ class ExtractionData:
     def has_required_fields(self) -> bool:
         """
         Verifica si tiene los campos obligatorios.
+        Checks if it has the required fields.
 
         Returns:
-            True si todos los campos requeridos tienen valor
+            True si todos los campos requeridos tienen valor / True if all required fields have a value
         """
         required_fields = [
             self.numero_documento.strip(),
@@ -136,9 +144,10 @@ class ExtractionData:
     def normalize(self) -> "ExtractionData":
         """
         Normaliza los valores (eliminar espacios, formatear fechas).
+        Normalizes the values (remove spaces, format dates).
 
         Returns:
-            Instancia normalizada
+            Instancia normalizada / Normalized instance
         """
         return ExtractionData(
             tipo_documento=self.tipo_documento.strip(),
@@ -164,12 +173,13 @@ class ExtractionData:
     def _normalize_date(date_str: str) -> str:
         """
         Normaliza el formato de una fecha.
+        Normalizes the format of a date.
 
         Args:
-            date_str: Fecha en cualquier formato
+            date_str: Fecha en cualquier formato / Date in any format
 
         Returns:
-            Fecha en formato DD/MM/YYYY o string original si no se puede normalizar
+            Fecha en formato DD/MM/YYYY o string original si no se puede normalizar / Date in DD/MM/YYYY format or original string if it cannot be normalized
         """
         if not date_str:
             return ""
@@ -177,13 +187,15 @@ class ExtractionData:
         date_str = date_str.strip()
 
         # Si ya está en formato DD/MM/YYYY, retornamos
+        # If already in DD/MM/YYYY format, return as is
         if "/" in date_str and len(date_str.split("/")) == 3:
             return date_str
 
         # Si está en formato YYYY-MM-DD, convertimos a DD/MM/YYYY
+        # If in YYYY-MM-DD format, convert to DD/MM/YYYY
         if "-" in date_str and len(date_str.split("-")) == 3:
             parts = date_str.split("-")
-            if len(parts[0]) == 4:  # Formato YYYY-MM-DD
+            if len(parts[0]) == 4:  # Formato YYYY-MM-DD / YYYY-MM-DD format
                 return f"{parts[2]}/{parts[1]}/{parts[0]}"
 
         return date_str

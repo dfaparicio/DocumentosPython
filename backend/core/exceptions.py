@@ -1,13 +1,17 @@
 """
 Excepciones personalizadas jerárquicas para la aplicación.
 Reemplaza las 11 instancias de `except Exception` genéricas.
+
+Hierarchical custom exceptions for the application.
+Replaces the 11 instances of generic `except Exception`.
 """
 
 from typing import Optional, Any
 
 
 class DocumentExtractionError(Exception):
-    """Base exception para errores de extracción de documentos."""
+    """Base exception para errores de extracción de documentos.
+    Base exception for document extraction errors."""
 
     def __init__(
         self,
@@ -17,11 +21,12 @@ class DocumentExtractionError(Exception):
     ):
         """
         Inicializa la excepción.
+        Initializes the exception.
 
         Args:
-            message: Mensaje de error
-            details: Detalles adicionales del error
-            original_error: Excepción original si se está envolviendo
+            message: Mensaje de error / Error message
+            details: Detalles adicionales del error / Additional error details
+            original_error: Excepción original si se está envolviendo / Original exception if wrapping
         """
         super().__init__(message)
         self.message = message
@@ -29,7 +34,8 @@ class DocumentExtractionError(Exception):
         self.original_error = original_error
 
     def to_dict(self) -> dict:
-        """Convierte la excepción a diccionario."""
+        """Convierte la excepción a diccionario.
+        Converts the exception to a dictionary."""
         result = {
             "error_type": self.__class__.__name__,
             "message": self.message
@@ -40,7 +46,8 @@ class DocumentExtractionError(Exception):
 
 
 class AIServiceError(DocumentExtractionError):
-    """Error en servicio de IA."""
+    """Error en servicio de IA.
+    Error in AI service."""
 
     def __init__(
         self,
@@ -50,11 +57,12 @@ class AIServiceError(DocumentExtractionError):
     ):
         """
         Inicializa la excepción de IA.
+        Initializes the AI exception.
 
         Args:
-            message: Mensaje de error
-            model: Modelo de IA que falló
-            **kwargs: Argumentos adicionales
+            message: Mensaje de error / Error message
+            model: Modelo de IA que falló / AI model that failed
+            **kwargs: Argumentos adicionales / Additional arguments
         """
         details = kwargs.pop("details", {})
         if model:
@@ -64,7 +72,8 @@ class AIServiceError(DocumentExtractionError):
 
 
 class AIServiceTimeoutError(AIServiceError):
-    """Timeout en llamada a IA."""
+    """Timeout en llamada a IA.
+    Timeout in AI call."""
 
     def __init__(
         self,
@@ -74,11 +83,12 @@ class AIServiceTimeoutError(AIServiceError):
     ):
         """
         Inicializa la excepción de timeout.
+        Initializes the timeout exception.
 
         Args:
-            message: Mensaje de error
-            timeout_seconds: Timeout en segundos
-            **kwargs: Argumentos adicionales
+            message: Mensaje de error / Error message
+            timeout_seconds: Timeout en segundos / Timeout in seconds
+            **kwargs: Argumentos adicionales / Additional arguments
         """
         details = kwargs.pop("details", {})
         if timeout_seconds:
@@ -88,7 +98,8 @@ class AIServiceTimeoutError(AIServiceError):
 
 
 class AIServiceRateLimitError(AIServiceError):
-    """Excedido rate limit de IA."""
+    """Excedido rate limit de IA.
+    AI rate limit exceeded."""
 
     def __init__(
         self,
@@ -98,11 +109,12 @@ class AIServiceRateLimitError(AIServiceError):
     ):
         """
         Inicializa la excepción de rate limit.
+        Initializes the rate limit exception.
 
         Args:
-            message: Mensaje de error
-            retry_after: Segundos antes de reintentar
-            **kwargs: Argumentos adicionales
+            message: Mensaje de error / Error message
+            retry_after: Segundos antes de reintentar / Seconds before retrying
+            **kwargs: Argumentos adicionales / Additional arguments
         """
         details = kwargs.pop("details", {})
         if retry_after:
@@ -112,7 +124,8 @@ class AIServiceRateLimitError(AIServiceError):
 
 
 class DocumentParsingError(DocumentExtractionError):
-    """Error al parsear documento."""
+    """Error al parsear documento.
+    Error parsing document."""
 
     def __init__(
         self,
@@ -123,12 +136,13 @@ class DocumentParsingError(DocumentExtractionError):
     ):
         """
         Inicializa la excepción de parsing.
+        Initializes the parsing exception.
 
         Args:
-            message: Mensaje de error
-            file_type: Tipo de archivo
-            file_name: Nombre del archivo
-            **kwargs: Argumentos adicionales
+            message: Mensaje de error / Error message
+            file_type: Tipo de archivo / File type
+            file_name: Nombre del archivo / File name
+            **kwargs: Argumentos adicionales / Additional arguments
         """
         details = kwargs.pop("details", {})
         if file_type:
@@ -141,7 +155,8 @@ class DocumentParsingError(DocumentExtractionError):
 
 
 class PDFParsingError(DocumentParsingError):
-    """Error específico al parsear PDF."""
+    """Error específico al parsear PDF.
+    Specific error parsing PDF."""
 
     def __init__(
         self,
@@ -151,11 +166,12 @@ class PDFParsingError(DocumentParsingError):
     ):
         """
         Inicializa la excepción de PDF.
+        Initializes the PDF exception.
 
         Args:
-            message: Mensaje de error
-            page_number: Número de página que falló
-            **kwargs: Argumentos adicionales
+            message: Mensaje de error / Error message
+            page_number: Número de página que falló / Page number that failed
+            **kwargs: Argumentos adicionales / Additional arguments
         """
         details = kwargs.pop("details", {})
         if page_number is not None:
@@ -166,7 +182,8 @@ class PDFParsingError(DocumentParsingError):
 
 
 class WordParsingError(DocumentParsingError):
-    """Error específico al parsear Word."""
+    """Error específico al parsear Word.
+    Specific error parsing Word."""
 
     def __init__(
         self,
@@ -175,17 +192,19 @@ class WordParsingError(DocumentParsingError):
     ):
         """
         Inicializa la excepción de Word.
+        Initializes the Word exception.
 
         Args:
-            message: Mensaje de error
-            **kwargs: Argumentos adicionales
+            message: Mensaje de error / Error message
+            **kwargs: Argumentos adicionales / Additional arguments
         """
         kwargs["file_type"] = "Word"
         super().__init__(message, **kwargs)
 
 
 class ValidationError(DocumentExtractionError):
-    """Error de validación de datos extraídos."""
+    """Error de validación de datos extraídos.
+    Validation error for extracted data."""
 
     def __init__(
         self,
@@ -196,12 +215,13 @@ class ValidationError(DocumentExtractionError):
     ):
         """
         Inicializa la excepción de validación.
+        Initializes the validation exception.
 
         Args:
-            message: Mensaje de error
-            field: Campo que falló la validación
-            value: Valor que falló la validación
-            **kwargs: Argumentos adicionales
+            message: Mensaje de error / Error message
+            field: Campo que falló la validación / Field that failed validation
+            value: Valor que falló la validación / Value that failed validation
+            **kwargs: Argumentos adicionales / Additional arguments
         """
         details = kwargs.pop("details", {})
         if field:
@@ -214,7 +234,8 @@ class ValidationError(DocumentExtractionError):
 
 
 class InconsistentDocumentError(ValidationError):
-    """Error cuando las caras de un documento son inconsistentes."""
+    """Error cuando las caras de un documento son inconsistentes.
+    Error when document faces are inconsistent."""
 
     def __init__(
         self,
@@ -226,13 +247,14 @@ class InconsistentDocumentError(ValidationError):
     ):
         """
         Inicializa la excepción de inconsistencia.
+        Initializes the inconsistency exception.
 
         Args:
-            message: Mensaje de error
-            field: Campo inconsistente
-            frontal_value: Valor de la cara frontal
-            back_value: Valor de la cara trasera
-            **kwargs: Argumentos adicionales
+            message: Mensaje de error / Error message
+            field: Campo inconsistente / Inconsistent field
+            frontal_value: Valor de la cara frontal / Front face value
+            back_value: Valor de la cara trasera / Back face value
+            **kwargs: Argumentos adicionales / Additional arguments
         """
         details = kwargs.pop("details", {})
         if field:

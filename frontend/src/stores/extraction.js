@@ -9,8 +9,20 @@ export const useExtractionStore = defineStore('extraction', () => {
   const excelFile = ref(null)
   const excelFileName = ref('')
 
+  // Progreso del procesamiento
+  const progress = ref({
+    status: 'idle',
+    total_pages: 0,
+    processed_pages: 0,
+    current_page: 0,
+    documents_found: 0,
+    errors: 0,
+    percentage: 0
+  })
+
   const hasFile = computed(() => selectedFile.value !== null)
   const hasError = computed(() => errorMessage.value !== '')
+  const isProcessing = computed(() => loading.value && progress.value.status === 'processing')
 
   function setFile(file) {
     selectedFile.value = file
@@ -50,10 +62,27 @@ export const useExtractionStore = defineStore('extraction', () => {
     excelFileName.value = ''
   }
 
+  function setProgress(data) {
+    progress.value = { ...data }
+  }
+
+  function resetProgress() {
+    progress.value = {
+      status: 'idle',
+      total_pages: 0,
+      processed_pages: 0,
+      current_page: 0,
+      documents_found: 0,
+      errors: 0,
+      percentage: 0
+    }
+  }
+
   function clearAll() {
     clearFile()
     clearMessages()
     clearExcel()
+    resetProgress()
   }
 
   return {
@@ -63,8 +92,10 @@ export const useExtractionStore = defineStore('extraction', () => {
     successMessage,
     excelFile,
     excelFileName,
+    progress,
     hasFile,
     hasError,
+    isProcessing,
     setFile,
     clearFile,
     setLoading,
@@ -73,6 +104,8 @@ export const useExtractionStore = defineStore('extraction', () => {
     clearMessages,
     setExcelFile,
     clearExcel,
+    setProgress,
+    resetProgress,
     clearAll
   }
 })

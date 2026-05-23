@@ -1,6 +1,9 @@
 """
 Factorías para inyección de dependencias.
 Usa @lru_cache para crear singletons de servicios.
+
+Factories for dependency injection.
+Uses @lru_cache to create service singletons.
 """
 
 import logging
@@ -21,9 +24,10 @@ logger = logging.getLogger(__name__)
 def get_ai_provider() -> AIProvider:
     """
     Retorna la instancia singleton del proveedor de IA.
+    Returns the singleton instance of the AI provider.
 
     Returns:
-        Instancia de AIProvider
+        Instancia de AIProvider / AIProvider instance
     """
     settings = get_settings()
     provider = GeminiAIProvider(
@@ -39,9 +43,10 @@ def get_ai_provider() -> AIProvider:
 def get_cache_manager() -> CacheManager:
     """
     Retorna la instancia singleton del gestor de caché.
+    Returns the singleton instance of the cache manager.
 
     Returns:
-        Instancia de CacheManager
+        Instancia de CacheManager / CacheManager instance
     """
     return get_cache()
 
@@ -50,9 +55,10 @@ def get_cache_manager() -> CacheManager:
 def get_rate_limiter() -> RateLimiter:
     """
     Retorna la instancia singleton del rate limiter.
+    Returns the singleton instance of the rate limiter.
 
     Returns:
-        Instancia de RateLimiter
+        Instancia de RateLimiter / RateLimiter instance
     """
     return get_rate_limiter()
 
@@ -61,15 +67,17 @@ def get_rate_limiter() -> RateLimiter:
 def get_async_rate_limiter() -> AsyncSemaphoreRateLimiter:
     """
     Retorna la instancia singleton del rate limiter asíncrono.
+    Returns the singleton instance of the async rate limiter.
 
     Returns:
-        Instancia de AsyncSemaphoreRateLimiter
+        Instancia de AsyncSemaphoreRateLimiter / AsyncSemaphoreRateLimiter instance
     """
     return get_async_rate_limiter()
 
 
 def reset_singletons() -> None:
-    """Limpia todas las instancias singleton (útil para testing)."""
+    """Limpia todas las instancias singleton (útil para testing).
+    Clears all singleton instances (useful for testing)."""
     get_ai_provider.cache_clear()
     get_cache_manager.cache_clear()
     get_rate_limiter.cache_clear()

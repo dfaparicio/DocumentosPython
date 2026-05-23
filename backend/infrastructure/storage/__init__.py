@@ -1,5 +1,6 @@
 """
 Paquete de almacenamiento en caché y rate limiting.
+Caching and rate limiting storage package.
 """
 
 from .cache import CacheManager, get_cache

@@ -1,10 +1,16 @@
 """
 Prompts específicos para extracción de datos de documentos colombianos.
 Cada prompt está optimizado para un tipo de documento y tipo de cara específicos.
+
+Specific prompts for data extraction from Colombian documents.
+Each prompt is optimized for a specific document type and face type.
 """
+
+from typing import Dict, List
 
 DOCUMENT_PROMPTS = {
     # ========== CÉDULA DE CIUDADANÍA VIEJA ==========
+    # ========== OLD CITIZENSHIP CARD ==========
     "cedula_ciudadania_vieja_frontal": """
     Analiza esta CARA FRONTAL de una CÉDULA DE CIUDADANÍA COLOMBIANA (versión antigua, amarilla/rosada con foto en la izquierda).
     Extrae SOLO la información visible en ESTA cara.
@@ -56,6 +62,7 @@ DOCUMENT_PROMPTS = {
     """,
 
     # ========== CÉDULA DE CIUDADANÍA NUEVA ==========
+    # ========== NEW CITIZENSHIP CARD ==========
     "cedula_ciudadania_nueva_frontal": """
     Analiza esta CARA FRONTAL de una CÉDULA DE CIUDADANÍA COLOMBIANA (versión nueva, con diseño moderno, foto en el centro o derecha).
     Extrae SOLO la información visible en ESTA cara.
@@ -108,6 +115,7 @@ DOCUMENT_PROMPTS = {
     """,
 
     # ========== CÉDULA DIGITAL ==========
+    # ========== DIGITAL CITIZENSHIP CARD ==========
     "cedula_digital_frontal": """
     Analiza esta CARA FRONTAL de una CÉDULA DIGITAL COLOMBIANA (con código QR y diseño moderno).
     Extrae SOLO la información visible en ESTA cara.
@@ -160,6 +168,7 @@ DOCUMENT_PROMPTS = {
     """,
 
     # ========== TARJETA DE IDENTIDAD ==========
+    # ========== IDENTITY CARD ==========
     "tarjeta_identidad_frontal": """
     Analiza esta CARA FRONTAL de una TARJETA DE IDENTIDAD COLOMBIANA (para menores de edad).
     Extrae SOLO la información visible en ESTA cara.
@@ -212,6 +221,7 @@ DOCUMENT_PROMPTS = {
     """,
 
     # ========== CÉDULA DE EXTRANJERÍA ==========
+    # ========== FOREIGNER ID CARD ==========
     "cedula_extranjeria_frontal": """
     Analiza esta CARA FRONTAL de una CÉDULA DE EXTRANJERÍA COLOMBIANA.
     Extrae SOLO la información visible en ESTA cara.
@@ -266,6 +276,7 @@ DOCUMENT_PROMPTS = {
     """,
 
     # ========== PASAPORTE COLOMBIANO ==========
+    # ========== COLOMBIAN PASSPORT ==========
     "pasaporte_completo": """
     Analiza este PASAPORTE COLOMBIANO.
     Extrae TODA la información visible en esta única cara.
@@ -293,6 +304,7 @@ DOCUMENT_PROMPTS = {
     """,
 
     # ========== PERMISO PPT ==========
+    # ========== PPT PERMIT ==========
     "ppt_completo": """
     Analiza este PERMISO PPT (Permiso por Protección Temporal) COLOMBIANO.
     Extrae TODA la información visible en esta única cara.
@@ -320,6 +332,7 @@ DOCUMENT_PROMPTS = {
     """,
 
     # ========== OTROS DOCUMENTOS (GENÉRICO) ==========
+    # ========== OTHER DOCUMENTS (GENERIC) ==========
     "otro_completo": """
     Analiza este DOCUMENTO COLOMBIANO.
     Extrae TODA la información visible que puedas identificar.
@@ -344,6 +357,7 @@ DOCUMENT_PROMPTS = {
     """,
 
     # ========== PROMPT PARA CLASIFICACIÓN DE CARA ==========
+    # ========== PROMPT FOR FACE CLASSIFICATION ==========
     "clasificar_cara": """
     Analiza esta imagen y determina:
 
@@ -384,6 +398,7 @@ DOCUMENT_PROMPTS = {
     """,
 
     # ========== PROMPT PARA DETECTAR CARAS MIXTAS ==========
+    # ========== PROMPT FOR DETECTING MIXED FACES ==========
     "detectar_mixto": """
     Analiza esta imagen y determina si contiene DOS caras de un documento colombiano.
 
@@ -398,6 +413,7 @@ DOCUMENT_PROMPTS = {
     """,
 
     # ========== PROMPT PARA COORDENADAS DE DIVISIÓN ==========
+    # ========== PROMPT FOR SPLIT COORDINATES ==========
     "coordenadas_division": """
     Analiza esta imagen que contiene DOS caras de un documento colombiano.
 
@@ -442,28 +458,72 @@ def get_prompt(document_type: str, face_type: str) -> str:
 
     Returns:
         El prompt específico o un prompt genérico si no existe
+
+    Gets the specific prompt for a document type and face type.
+
+    Args:
+        document_type: Document type (e.g.: "cedula_ciudadania_vieja", "pasaporte", etc.)
+        face_type: Face type ("frontal", "trasera", "completo")
+
+    Returns:
+        The specific prompt or a generic prompt if not found
     """
     prompt_key = f"{document_type}_{face_type}"
     return DOCUMENT_PROMPTS.get(prompt_key, DOCUMENT_PROMPTS["otro_completo"])
 
 
 def get_classification_prompt() -> str:
-    """Obtiene el prompt para clasificar una cara."""
+    """Obtiene el prompt para clasificar una cara.
+    Gets the prompt for classifying a face."""
     return DOCUMENT_PROMPTS["clasificar_cara"]
 
 
 def get_mixed_detection_prompt() -> str:
-    """Obtiene el prompt para detectar caras mixtas."""
+    """Obtiene el prompt para detectar caras mixtas.
+    Gets the prompt for detecting mixed faces."""
     return DOCUMENT_PROMPTS["detectar_mixto"]
 
 
 def get_split_coordinates_prompt() -> str:
-    """Obtiene el prompt para obtener coordenadas de división."""
+    """Obtiene el prompt para obtener coordenadas de división.
+    Gets the prompt for obtaining split coordinates."""
     return DOCUMENT_PROMPTS["coordenadas_division"]
 
 
+def get_retry_prompt(existing_data: Dict[str, str], missing_fields: List[str]) -> str:
+    """
+    Genera un prompt de re-intento enfocado solo en los campos faltantes.
+
+    Generates a retry prompt focused only on the missing fields.
+    """
+    campos_encontrados = []
+    for key, value in existing_data.items():
+        if value and value.strip():
+            campos_encontrados.append(f"  - {key}: {value}")
+
+    campos_str = "\n".join(campos_encontrados) if campos_encontrados else "  (ninguno)"
+    faltantes_str = ", ".join(missing_fields)
+
+    return f"""Ya analizamos esta imagen de un documento colombiano y obtuvimos datos parciales.
+
+CAMPOS YA EXTRAIDOS CORRECTAMENTE:
+{campos_str}
+
+CAMPOS FALTANTES QUE NECESITAMOS: {faltantes_str}
+
+Concentrate SOLAMENTE en encontrar los campos faltantes.
+Lee el texto con MUCHO cuidado, caracter por caracter.
+Busca en toda la imagen, incluyendo textos pequenos o borrosos.
+
+Responde SOLO con JSON conteniendo UNICAMENTE los campos faltantes:
+{{"campo_faltante_1": "valor", "campo_faltante_2": "valor"}}
+
+Si un campo simplemente no es visible, dejalo como string vacio ""."""
+
+
 def get_all_document_types() -> list:
-    """Retorna la lista de todos los tipos de documentos soportados."""
+    """Retorna la lista de todos los tipos de documentos soportados.
+    Returns the list of all supported document types."""
     return [
         "cedula_ciudadania_vieja",
         "cedula_ciudadania_nueva",
@@ -477,7 +537,8 @@ def get_all_document_types() -> list:
 
 
 def get_two_face_document_types() -> list:
-    """Retorna la lista de tipos de documentos que tienen 2 caras."""
+    """Retorna la lista de tipos de documentos que tienen 2 caras.
+    Returns the list of document types that have 2 faces."""
     return [
         "cedula_ciudadania_vieja",
         "cedula_ciudadania_nueva",
@@ -488,7 +549,8 @@ def get_two_face_document_types() -> list:
 
 
 def get_one_face_document_types() -> list:
-    """Retorna la lista de tipos de documentos que tienen 1 sola cara."""
+    """Retorna la lista de tipos de documentos que tienen 1 sola cara.
+    Returns the list of document types that have only 1 face."""
     return [
         "pasaporte",
         "ppt",

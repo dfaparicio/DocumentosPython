@@ -1,6 +1,9 @@
 """
 Interfaz para proveedores de Inteligencia Artificial.
 Permite cambiar entre diferentes proveedores (Gemini, GPT, Claude, etc.) sin modificar el código de negocio.
+
+Interface for Artificial Intelligence providers.
+Allows switching between different providers (Gemini, GPT, Claude, etc.) without modifying business code.
 """
 
 from abc import ABC, abstractmethod
@@ -10,7 +13,8 @@ from enum import Enum
 
 
 class PromptType(Enum):
-    """Tipos de prompts para la IA."""
+    """Tipos de prompts para la IA.
+    Types of prompts for the AI."""
     CLASSIFICATION = "clasificar_cara"
     EXTRACTION = "extraction"
     MIXED_DETECTION = "detectar_mixto"
@@ -19,7 +23,8 @@ class PromptType(Enum):
 
 @dataclass
 class AIClassification:
-    """Resultado de clasificación de una imagen por la IA."""
+    """Resultado de clasificación de una imagen por la IA.
+    Result of classifying an image by the AI."""
 
     face_type: str  # FRONTAL, TRASERA, COMPLETO, MIXTO
     document_type: str
@@ -27,7 +32,8 @@ class AIClassification:
     features: Dict[str, bool]
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convierte a diccionario."""
+        """Convierte a diccionario.
+        Converts to dictionary."""
         return {
             "face_type": self.face_type,
             "document_type": self.document_type,
@@ -38,20 +44,23 @@ class AIClassification:
 
 @dataclass
 class AIExtraction:
-    """Resultado de extracción de datos de una imagen por la IA."""
+    """Resultado de extracción de datos de una imagen por la IA.
+    Result of data extraction from an image by the AI."""
 
     data: Dict[str, str]
     raw_response: str
     prompt_used: str
 
     def to_dict(self) -> Dict[str, str]:
-        """Convierte los datos extraídos a diccionario."""
+        """Convierte los datos extraídos a diccionario.
+        Converts the extracted data to a dictionary."""
         return self.data.copy()
 
 
 @dataclass
 class AIResponse:
-    """Respuesta genérica de la IA."""
+    """Respuesta genérica de la IA.
+    Generic AI response."""
 
     text: str
     model: str
@@ -63,9 +72,12 @@ class AIResponse:
 class AIProvider(ABC):
     """
     Interfaz abstracta para proveedores de IA.
-
-    Implementaciones específicas (Gemini, OpenAI, Anthropic, etc.)
+    Specific implementations (Gemini, OpenAI, Anthropic, etc.)
     deben heredar de esta clase.
+
+    Abstract interface for AI providers.
+    Specific implementations (Gemini, OpenAI, Anthropic, etc.)
+    must inherit from this class.
     """
 
     @abstractmethod
@@ -76,17 +88,18 @@ class AIProvider(ABC):
     ) -> AIClassification:
         """
         Clasifica una imagen de documento.
+        Classifies a document image.
 
         Args:
-            image_bytes: Imagen en bytes
-            prompt: Prompt específico (opcional)
+            image_bytes: Imagen en bytes / Image in bytes
+            prompt: Prompt específico (opcional) / Specific prompt (optional)
 
         Returns:
-            Resultado de clasificación
+            Resultado de clasificación / Classification result
 
         Raises:
-            AIServiceError: Si falla la clasificación
-            AIServiceTimeoutError: Si ocurre un timeout
+            AIServiceError: Si falla la clasificación / If classification fails
+            AIServiceTimeoutError: Si ocurre un timeout / If a timeout occurs
         """
         pass
 
@@ -100,19 +113,20 @@ class AIProvider(ABC):
     ) -> AIExtraction:
         """
         Extrae datos de una imagen de documento.
+        Extracts data from a document image.
 
         Args:
-            image_bytes: Imagen en bytes
-            document_type: Tipo de documento
-            face_type: Tipo de cara (frontal, trasera, completo)
-            prompt: Prompt específico (opcional)
+            image_bytes: Imagen en bytes / Image in bytes
+            document_type: Tipo de documento / Document type
+            face_type: Tipo de cara (frontal, trasera, completo) / Face type (front, back, complete)
+            prompt: Prompt específico (opcional) / Specific prompt (optional)
 
         Returns:
-            Datos extraídos
+            Datos extraídos / Extracted data
 
         Raises:
-            AIServiceError: Si falla la extracción
-            AIServiceTimeoutError: Si ocurre un timeout
+            AIServiceError: Si falla la extracción / If extraction fails
+            AIServiceTimeoutError: Si ocurre un timeout / If a timeout occurs
         """
         pass
 
@@ -127,20 +141,21 @@ class AIProvider(ABC):
     ) -> tuple[AIExtraction, AIExtraction]:
         """
         Extrae datos de dos caras de un documento.
+        Extracts data from two faces of a document.
 
         Args:
-            frontal_image: Imagen de la cara frontal
-            trasera_image: Imagen de la cara trasera
-            document_type: Tipo de documento
-            frontal_prompt: Prompt para cara frontal (opcional)
-            trasera_prompt: Prompt para cara trasera (opcional)
+            frontal_image: Imagen de la cara frontal / Front face image
+            trasera_image: Imagen de la cara trasera / Back face image
+            document_type: Tipo de documento / Document type
+            frontal_prompt: Prompt para cara frontal (opcional) / Prompt for front face (optional)
+            trasera_prompt: Prompt para cara trasera (opcional) / Prompt for back face (optional)
 
         Returns:
-            Tupla (datos_frontal, datos_trasera)
+            Tupla (datos_frontal, datos_trasera) / Tuple (front_data, back_data)
 
         Raises:
-            AIServiceError: Si falla la extracción
-            AIServiceTimeoutError: Si ocurre un timeout
+            AIServiceError: Si falla la extracción / If extraction fails
+            AIServiceTimeoutError: Si ocurre un timeout / If a timeout occurs
         """
         pass
 
@@ -152,17 +167,18 @@ class AIProvider(ABC):
     ) -> bool:
         """
         Detecta si una página contiene dos caras (mixta).
+        Detects if a page contains two faces (mixed).
 
         Args:
-            image_bytes: Imagen en bytes
-            prompt: Prompt específico (opcional)
+            image_bytes: Imagen en bytes / Image in bytes
+            prompt: Prompt específico (opcional) / Specific prompt (optional)
 
         Returns:
-            True si es mixta, False en caso contrario
+            True si es mixta, False en caso contrario / True if mixed, False otherwise
 
         Raises:
-            AIServiceError: Si falla la detección
-            AIServiceTimeoutError: Si ocurre un timeout
+            AIServiceError: Si falla la detección / If detection fails
+            AIServiceTimeoutError: Si ocurre un timeout / If a timeout occurs
         """
         pass
 
@@ -174,17 +190,18 @@ class AIProvider(ABC):
     ) -> Optional[Dict[str, Dict[str, int]]]:
         """
         Obtiene coordenadas para dividir una página mixta.
+        Gets coordinates to split a mixed page.
 
         Args:
-            image_bytes: Imagen en bytes
-            prompt: Prompt específico (opcional)
+            image_bytes: Imagen en bytes / Image in bytes
+            prompt: Prompt específico (opcional) / Specific prompt (optional)
 
         Returns:
-            Coordenadas de división o None si falla
+            Coordenadas de división o None si falla / Split coordinates or None if it fails
 
         Raises:
-            AIServiceError: Si falla la obtención de coordenadas
-            AIServiceTimeoutError: Si ocurre un timeout
+            AIServiceError: Si falla la obtención de coordenadas / If getting coordinates fails
+            AIServiceTimeoutError: Si ocurre un timeout / If a timeout occurs
         """
         pass
 
@@ -192,9 +209,10 @@ class AIProvider(ABC):
     def get_model_name(self) -> str:
         """
         Retorna el nombre del modelo de IA.
+        Returns the name of the AI model.
 
         Returns:
-            Nombre del modelo
+            Nombre del modelo / Model name
         """
         pass
 
@@ -202,8 +220,9 @@ class AIProvider(ABC):
     def is_available(self) -> bool:
         """
         Verifica si el servicio de IA está disponible.
+        Verifies if the AI service is available.
 
         Returns:
-            True si está disponible
+            True si está disponible / True if available
         """
         pass

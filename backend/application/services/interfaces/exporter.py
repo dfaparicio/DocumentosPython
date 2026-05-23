@@ -1,6 +1,9 @@
 """
 Interfaz para exportadores de datos.
 Permite exportar a diferentes formatos (Excel, CSV, JSON, etc.).
+
+Interface for data exporters.
+Allows exporting to different formats (Excel, CSV, JSON, etc.).
 """
 
 from abc import ABC, abstractmethod
@@ -11,9 +14,12 @@ import io
 class Exporter(ABC):
     """
     Interfaz abstracta para exportadores de datos.
-
-    Implementaciones específicas (ExcelExporter, CSVExporter, JSONExporter, etc.)
+    Specific implementations (ExcelExporter, CSVExporter, JSONExporter, etc.)
     deben heredar de esta clase.
+
+    Abstract interface for data exporters.
+    Specific implementations (ExcelExporter, CSVExporter, JSONExporter, etc.)
+    must inherit from this class.
     """
 
     @abstractmethod
@@ -24,16 +30,17 @@ class Exporter(ABC):
     ) -> io.BytesIO:
         """
         Exporta los datos al formato específico.
+        Exports data to the specific format.
 
         Args:
-            data: Lista de diccionarios con los datos a exportar
-            columns: Lista de columnas (opcional, usa todas si no se especifica)
+            data: Lista de diccionarios con los datos a exportar / List of dictionaries with data to export
+            columns: Lista de columnas (opcional, usa todas si no se especifica) / List of columns (optional, uses all if not specified)
 
         Returns:
-            BytesIO con el contenido exportado
+            BytesIO con el contenido exportado / BytesIO with the exported content
 
         Raises:
-            ValueError: Si los datos no son válidos
+            ValueError: Si los datos no son válidos / If the data is not valid
         """
         pass
 
@@ -41,9 +48,10 @@ class Exporter(ABC):
     def get_content_type(self) -> str:
         """
         Retorna el tipo MIME del contenido exportado.
+        Returns the MIME type of the exported content.
 
         Returns:
-            Tipo MIME (ej: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            Tipo MIME (ej: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") / MIME type (e.g.: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         """
         pass
 
@@ -51,9 +59,10 @@ class Exporter(ABC):
     def get_file_extension(self) -> str:
         """
         Retorna la extensión del archivo exportado.
+        Returns the extension of the exported file.
 
         Returns:
-            Extensión del archivo (ej: ".xlsx")
+            Extensión del archivo (ej: ".xlsx") / File extension (e.g.: ".xlsx")
         """
         pass
 
@@ -61,8 +70,9 @@ class Exporter(ABC):
     def get_format_name(self) -> str:
         """
         Retorna el nombre del formato.
+        Returns the format name.
 
         Returns:
-            Nombre del formato (ej: "Excel", "CSV", "JSON")
+            Nombre del formato (ej: "Excel", "CSV", "JSON") / Format name (e.g.: "Excel", "CSV", "JSON")
         """
         pass

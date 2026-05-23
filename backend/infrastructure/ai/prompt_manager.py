@@ -1,6 +1,9 @@
 """
 Gestor de prompts para la IA.
 Consolida los prompts de document_prompts.py y añade caché.
+
+Prompt manager for the AI.
+Consolidates prompts from document_prompts.py and adds caching.
 """
 
 import logging
@@ -18,9 +21,15 @@ class PromptManager:
 
     Centraliza todos los prompts usados para interactuar con Gemini
     y los mantiene en caché para evitar reconstrucciones.
+
+    Prompt manager for the AI.
+
+    Centralizes all prompts used to interact with Gemini
+    and caches them to avoid reconstructions.
     """
 
     # Prompts de clasificación
+    # Classification prompts
     _CLASSIFICATION_PROMPT = """
 Analiza esta imagen y determina:
 
@@ -61,6 +70,7 @@ Responde en formato JSON:
 """
 
     # Prompt para detectar páginas mixtas
+    # Prompt to detect mixed pages
     _MIXED_DETECTION_PROMPT = """
 Analiza esta imagen y determina si contiene DOS caras de un documento colombiano.
 
@@ -75,6 +85,7 @@ Responde SOLO con "SI" o "NO".
 """
 
     # Prompt para obtener coordenadas de división
+    # Prompt to get split coordinates
     _SPLIT_COORDINATES_PROMPT = """
 Analiza esta imagen que contiene DOS caras de un documento colombiano.
 
@@ -108,10 +119,15 @@ Considera:
 """
 
     def __init__(self):
-        """Inicializa el gestor de prompts."""
+        """
+        Inicializa el gestor de prompts.
+
+        Initializes the prompt manager.
+        """
         self._cache = {}
 
         # Mapeo interno de tipos de prompt a funciones generadoras
+        # Internal mapping of prompt types to generator functions
         self._prompt_generators = {
             PromptType.CLASSIFICATION: self._get_classification_prompt,
             PromptType.MIXED_DETECTION: self._get_mixed_detection_prompt,
@@ -130,13 +146,24 @@ Considera:
 
         Returns:
             Prompt solicitado
+
+        Gets a specific prompt.
+
+        Args:
+            prompt_type: Type of prompt
+            **kwargs: Additional parameters for parameterized prompts
+
+        Returns:
+            Requested prompt
         """
         # Intentar obtener del caché
+        # Try to get from cache
         cache_key = f"{prompt_type.value}:{str(sorted(kwargs.items()))}"
         if cache_key in self._cache:
             return self._cache[cache_key]
 
         # Generar prompt
+        # Generate prompt
         if prompt_type in self._prompt_generators:
             prompt = self._prompt_generators[prompt_type](**kwargs)
         else:
@@ -144,6 +171,7 @@ Considera:
             prompt = ""
 
         # Cachear
+        # Cache
         self._cache[cache_key] = prompt
         return prompt
 
@@ -157,8 +185,18 @@ Considera:
 
         Returns:
             Prompt específico para extracción
+
+        Generates a specific prompt for data extraction.
+
+        Args:
+            document_type: Document type
+            face_type: Face type (front, back, complete)
+
+        Returns:
+            Specific prompt for extraction
         """
         # Mapear tipos a nombres legibles
+        # Map types to readable names
         type_names = {
             "cedula_ciudadania_vieja": "Cédula de Ciudadanía Vieja",
             "cedula_ciudadania_nueva": "Cédula de Ciudadanía Nueva",
@@ -257,24 +295,41 @@ Ejemplo:
             return ""
 
     def _get_classification_prompt(self) -> str:
-        """Retorna el prompt de clasificación."""
+        """
+        Retorna el prompt de clasificación.
+
+        Returns the classification prompt.
+        """
         return self._CLASSIFICATION_PROMPT
 
     def _get_mixed_detection_prompt(self) -> str:
-        """Retorna el prompt de detección de páginas mixtas."""
+        """
+        Retorna el prompt de detección de páginas mixtas.
+
+        Returns the mixed page detection prompt.
+        """
         return self._MIXED_DETECTION_PROMPT
 
     def _get_split_coordinates_prompt(self) -> str:
-        """Retorna el prompt de coordenadas de división."""
+        """
+        Retorna el prompt de coordenadas de división.
+
+        Returns the split coordinates prompt.
+        """
         return self._SPLIT_COORDINATES_PROMPT
 
     def clear_cache(self) -> None:
-        """Limpia el caché de prompts."""
+        """
+        Limpia el caché de prompts.
+
+        Clears the prompt cache.
+        """
         self._cache.clear()
         logger.info("Caché de prompts limpiado")
 
 
 # Instancia global del gestor de prompts
+# Global instance of the prompt manager
 _prompt_manager_instance: Optional[PromptManager] = None
 
 
@@ -284,6 +339,11 @@ def get_prompt_manager() -> PromptManager:
 
     Returns:
         Instancia de PromptManager
+
+    Returns the singleton instance of the prompt manager.
+
+    Returns:
+        PromptManager instance
     """
     global _prompt_manager_instance
     if _prompt_manager_instance is None:

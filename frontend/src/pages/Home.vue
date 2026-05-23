@@ -12,9 +12,9 @@
       </header>
 
       <!-- Main Content -->
-      <div class="main-content">
-        <!-- Left Column: Upload -->
-        <div class="column left-column">
+      <div class="main-content" :class="{ 'has-results': excelFile && !loading }">
+        <!-- Upload Column (centered when alone, left when results exist) -->
+        <div class="column upload-column">
           <div class="card upload-card">
             <h2 class="card-title">Sube tu PDF aquí</h2>
 
@@ -27,14 +27,10 @@
               @drop.prevent="onDrop"
               @click="selectFile"
             >
-              <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.935 6h4a5 5 0 011.897-1.903A4 4 0 0121 16V7a4 4 0 00-4-4H7zm3 4V6h3v4h-3z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v9"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15l3 3"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 12l3-3"/>
-              </svg>
-
+           <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16V4m0 0L8 8m4-4l4 4"/>
+  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 16v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2"/>
+</svg>
               <p class="upload-text">
                 Arrastra un PDF aquí o haz clic para seleccionar
               </p>
@@ -102,17 +98,37 @@
           </div>
         </div>
 
-        <!-- Right Column: Results -->
-        <div class="column right-column">
-          <!-- Success Card -->
+        <!-- Right Column: Results (solo visible cuando hay resultados) -->
+        <div v-if="excelFile && !loading" class="column right-column">
+          <!-- Success Card with Results -->
           <div v-if="excelFile && !loading" class="card success-card">
-            <svg class="success-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s-5 3.478-5 10c0 5.523 4.477 10 10s10-4.477 10-10S17.523 2 12 2zm-1.177-7.86l-2.765 2.247 6.223 5.012 1.384-3.168L5.863 8.65 7.236-5.012 1.177 3.857-.233 4.005-1.177 7.86z"/>
+            <svg class="success-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
             </svg>
 
             <div class="success-content">
               <h3 class="success-title">¡Excel generado correctamente!</h3>
-              <p class="success-message">Tu archivo está listo para descargar</p>
+              <p class="success-message">{{ successMessage }}</p>
+
+              <!-- Results Summary -->
+              <div v-if="progress.total_pages > 0" class="results-summary">
+                <div class="result-item">
+                  <span class="result-number">{{ progress.documents_found || '—' }}</span>
+                  <span class="result-label">Documentos</span>
+                </div>
+                <div class="result-item">
+                  <span class="result-number">{{ progress.total_pages }}</span>
+                  <span class="result-label">Páginas</span>
+                </div>
+                <div v-if="progress.errors > 0" class="result-item result-error">
+                  <span class="result-number">{{ progress.errors }}</span>
+                  <span class="result-label">Errores</span>
+                </div>
+              </div>
+
+              <p v-if="progress.errors > 0" class="review-notice">
+                ⚠️ Revisa la hoja <strong>"Revisión Requerida"</strong> en el Excel para ver las páginas con problemas.
+              </p>
             </div>
           </div>
 
@@ -125,19 +141,11 @@
             <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10l5 5 5-5"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15V3"/>
             </svg>
             Descargar Excel
           </button>
 
-          <!-- Initial Card -->
-          <div v-if="!excelFile && !selectedFile" class="card initial-card">
-            <svg class="initial-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 6v-6m2 0h-7"/>
-            </svg>
-
-            <h3 class="initial-title">Comienza subiendo un PDF</h3>
-            <p class="initial-message">Arrastra tu archivo o haz clic en el área de subida para comenzar</p>
-          </div>
         </div>
       </div>
 
@@ -151,12 +159,52 @@
       </div>
     </div>
 
-    <!-- Loading Overlay -->
+    <!-- Loading Overlay with LIVE Progress -->
     <div v-if="loading" class="loading-overlay">
       <div class="loading-content">
         <div class="spinner"></div>
-        <p class="loading-text">Procesando PDF...</p>
-        <p class="loading-subtext">Esto puede tardar unos segundos</p>
+
+        <!-- Progress Info -->
+        <div v-if="progress.status === 'converting'" class="progress-section">
+          <p class="loading-text">📄 Convirtiendo PDF a imágenes...</p>
+          <p class="loading-subtext">Preparando las páginas para el análisis</p>
+        </div>
+
+        <div v-else-if="progress.status === 'processing'" class="progress-section">
+          <p class="loading-text">🤖 Analizando documentos con IA...</p>
+
+          <!-- Progress Bar -->
+          <div class="progress-bar-container">
+            <div class="progress-bar" :style="{ width: progress.percentage + '%' }"></div>
+          </div>
+
+          <p class="progress-percentage">{{ Math.round(progress.percentage) }}%</p>
+
+          <!-- Stats -->
+          <div class="progress-stats">
+            <div class="stat">
+              <span class="stat-value">{{ progress.processed_pages }}</span>
+              <span class="stat-label">de {{ progress.total_pages }} páginas</span>
+            </div>
+            <div v-if="progress.documents_found > 0" class="stat">
+              <span class="stat-value">{{ progress.documents_found }}</span>
+              <span class="stat-label">documentos</span>
+            </div>
+            <div v-if="progress.errors > 0" class="stat stat-error">
+              <span class="stat-value">{{ progress.errors }}</span>
+              <span class="stat-label">errores</span>
+            </div>
+          </div>
+
+          <p class="loading-subtext">
+            Procesando página {{ progress.current_page }} de {{ progress.total_pages }}
+          </p>
+        </div>
+
+        <div v-else class="progress-section">
+          <p class="loading-text">Procesando PDF...</p>
+          <p class="loading-subtext">Esto puede tardar unos segundos</p>
+        </div>
       </div>
     </div>
   </div>
@@ -178,6 +226,7 @@ const selectedFile = computed(() => store.selectedFile)
 const loading = computed(() => store.loading)
 const excelFile = computed(() => store.excelFile)
 const successMessage = computed(() => store.successMessage)
+const progress = computed(() => store.progress)
 
 function onDragOver() {
   isDragging.value = true
@@ -248,6 +297,7 @@ function formatFileSize(bytes) {
 }
 </script>
 
+
 <style scoped>
 .home {
   min-height: 100vh;
@@ -274,10 +324,24 @@ function formatFileSize(bytes) {
 }
 
 .main-content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  justify-content: center;
   gap: 24px;
   margin-bottom: 40px;
+}
+
+.main-content.has-results {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.upload-column {
+  max-width: 600px;
+  width: 100%;
+}
+
+.main-content.has-results .upload-column {
+  max-width: none;
 }
 
 .column {
@@ -465,8 +529,12 @@ function formatFileSize(bytes) {
 }
 
 @media (max-width: 768px) {
-  .main-content {
+  .main-content.has-results {
     grid-template-columns: 1fr;
+  }
+
+  .upload-column {
+    max-width: none;
   }
 
   .title {
@@ -477,9 +545,117 @@ function formatFileSize(bytes) {
     font-size: 16px;
   }
 
-  .success-card,
-  .initial-card {
+  .success-card {
     padding: 24px;
   }
+}
+
+/* Progress Bar */
+.progress-section {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 12px;
+  background: var(--gray-200);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 16px 0 8px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
+  border-radius: 6px;
+  transition: width 0.5s ease;
+  min-width: 2%;
+}
+
+.progress-percentage {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--gray-800);
+  margin: 8px 0 16px;
+}
+
+.progress-stats {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gray-800);
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-top: 2px;
+}
+
+.stat-error .stat-value {
+  color: #ef4444;
+}
+
+.stat-error .stat-label {
+  color: #ef4444;
+}
+
+/* Results Summary */
+.results-summary {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin: 20px 0;
+  padding: 16px;
+  background: var(--gray-50);
+  border-radius: 12px;
+}
+
+.result-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 16px;
+}
+
+.result-number {
+  font-size: 28px;
+  font-weight: 700;
+  color: #4f46e5;
+}
+
+.result-label {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin-top: 4px;
+}
+
+.result-error .result-number {
+  color: #ef4444;
+}
+
+.review-notice {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #92400e;
+  text-align: left;
 }
 </style>

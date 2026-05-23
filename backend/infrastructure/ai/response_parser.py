@@ -1,6 +1,9 @@
 """
 Parser seguro de respuestas JSON de la IA.
 Reemplaza las 3 instancias inseguras de `eval()`.
+
+Safe parser for AI JSON responses.
+Replaces the 3 unsafe instances of `eval()`.
 """
 
 import json
@@ -13,7 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 class JSONResponseParser:
-    """Parser seguro de respuestas JSON de la IA."""
+    """
+    Parser seguro de respuestas JSON de la IA.
+
+    Safe parser for AI JSON responses.
+    """
 
     def __init__(self, strict_mode: bool = True):
         """
@@ -22,6 +29,12 @@ class JSONResponseParser:
         Args:
             strict_mode: Si es True, lanza excepción en errores de parsing.
                          Si es False, retorna dict vacío en errores.
+
+        Initializes the parser.
+
+        Args:
+            strict_mode: If True, raises an exception on parsing errors.
+                         If False, returns an empty dict on errors.
         """
         self.strict_mode = strict_mode
 
@@ -37,6 +50,17 @@ class JSONResponseParser:
 
         Raises:
             AIServiceError: Si el parsing falla y strict_mode es True
+
+        Safely parses an AI response into a dictionary.
+
+        Args:
+            response_text: AI response text
+
+        Returns:
+            Parsed dictionary
+
+        Raises:
+            AIServiceError: If parsing fails and strict_mode is True
         """
         if not response_text:
             logger.warning("Respuesta vacía recibida de la IA")
@@ -45,13 +69,16 @@ class JSONResponseParser:
             return {}
 
         # Limpiar el texto
+        # Clean the text
         cleaned_text = self._clean_response(response_text)
 
         try:
             # Usar json.loads en lugar de eval()
+            # Use json.loads instead of eval()
             result = json.loads(cleaned_text)
 
             # Validar que el resultado sea un diccionario
+            # Validate that the result is a dictionary
             if not isinstance(result, dict):
                 logger.error(
                     f"La respuesta no es un diccionario",
@@ -98,10 +125,23 @@ class JSONResponseParser:
 
         Raises:
             AIServiceError: Si el parsing falla o faltan campos requeridos
+
+        Parses and validates the AI response.
+
+        Args:
+            response_text: AI response text
+            required_fields: List of required fields that must be present
+
+        Returns:
+            Parsed and validated dictionary
+
+        Raises:
+            AIServiceError: If parsing fails or required fields are missing
         """
         result = self.parse(response_text)
 
         # Validar campos requeridos
+        # Validate required fields
         if required_fields:
             missing_fields = [
                 field for field in required_fields
@@ -118,6 +158,7 @@ class JSONResponseParser:
                         details={"missing_fields": missing_fields}
                     )
                 # Agregar campos faltantes con valores vacíos
+                # Add missing fields with empty values
                 for field in missing_fields:
                     result[field] = ""
 
@@ -132,11 +173,21 @@ class JSONResponseParser:
 
         Returns:
             Texto limpio
+
+        Cleans the AI response before parsing.
+
+        Args:
+            response_text: Original response text
+
+        Returns:
+            Cleaned text
         """
         # Eliminar espacios en blanco al inicio y final
+        # Remove leading and trailing whitespace
         cleaned = response_text.strip()
 
         # Eliminar bloques de código markdown
+        # Remove markdown code blocks
         if cleaned.startswith("```json"):
             cleaned = cleaned.replace("```json", "", 1)
         elif cleaned.startswith("```"):
@@ -146,6 +197,7 @@ class JSONResponseParser:
             cleaned = cleaned[:-3]
 
         # Eliminar espacios restantes
+        # Remove remaining whitespace
         cleaned = cleaned.strip()
 
         return cleaned
@@ -166,16 +218,28 @@ class JSONResponseParser:
 
         Returns:
             Diccionario con todos los campos requeridos y opcionales
+
+        Ensures all required fields are present in the result.
+
+        Args:
+            data: Data dictionary
+            required_fields: List of required fields
+            optional_fields: List of optional fields (added with empty value if missing)
+
+        Returns:
+            Dictionary with all required and optional fields
         """
         result = data.copy()
 
         # Asegurar campos requeridos
+        # Ensure required fields
         for field in required_fields:
             if field not in result:
                 logger.warning(f"Campo requerido faltante, usando valor vacío: {field}")
                 result[field] = ""
 
         # Asegurar campos opcionales
+        # Ensure optional fields
         if optional_fields:
             for field in optional_fields:
                 if field not in result:
@@ -185,6 +249,7 @@ class JSONResponseParser:
 
 
 # Instancia global del parser
+# Global instance of the parser
 _parser_instance: Optional[JSONResponseParser] = None
 
 
@@ -197,6 +262,14 @@ def get_parser(strict_mode: bool = True) -> JSONResponseParser:
 
     Returns:
         Instancia de JSONResponseParser
+
+    Returns the singleton instance of the parser.
+
+    Args:
+        strict_mode: Strict mode of the parser
+
+    Returns:
+        JSONResponseParser instance
     """
     global _parser_instance
     if _parser_instance is None:
@@ -214,6 +287,15 @@ def parse_response(response_text: str, strict_mode: bool = True) -> Dict[str, An
 
     Returns:
         Diccionario parseado
+
+    Convenience function to parse a response.
+
+    Args:
+        response_text: AI response text
+        strict_mode: If True, raises an exception on errors
+
+    Returns:
+        Parsed dictionary
     """
     parser = get_parser(strict_mode=strict_mode)
     return parser.parse(response_text)

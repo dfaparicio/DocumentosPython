@@ -1,6 +1,9 @@
 """
 Paquete central de la aplicación.
 Contiene excepciones personalizadas, seguridad e inyección de dependencias.
+
+Central package of the application.
+Contains custom exceptions, security, and dependency injection.
 """
 
 from .exceptions import (

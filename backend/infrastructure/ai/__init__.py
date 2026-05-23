@@ -1,6 +1,9 @@
 """
 Paquete de infraestructura de IA.
 Contiene implementaciones de proveedores de IA, gestión de prompts y parsing de respuestas.
+
+AI infrastructure package.
+Contains implementations of AI providers, prompt management, and response parsing.
 """
 
 from .response_parser import JSONResponseParser, get_parser, parse_response
