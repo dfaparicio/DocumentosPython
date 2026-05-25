@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import axios from 'axios'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export const useExtractionStore = defineStore('extraction', () => {
   const selectedFile = ref(null)
@@ -19,6 +22,11 @@ export const useExtractionStore = defineStore('extraction', () => {
     errors: 0,
     percentage: 0
   })
+
+  // API Key state
+  const apiKeyConfigured = ref(false)
+  const apiKeyMasked = ref('')
+  const apiKeyLoading = ref(false)
 
   const hasFile = computed(() => selectedFile.value !== null)
   const hasError = computed(() => errorMessage.value !== '')
@@ -85,6 +93,51 @@ export const useExtractionStore = defineStore('extraction', () => {
     resetProgress()
   }
 
+  // API Key actions
+  async function fetchApiKeyStatus() {
+    try {
+      apiKeyLoading.value = true
+      const response = await axios.get(`${API_URL}/api/config/api-key`)
+      apiKeyConfigured.value = response.data.configured
+      apiKeyMasked.value = response.data.masked || ''
+    } catch (error) {
+      console.error('Error al obtener estado de API key:', error)
+      apiKeyConfigured.value = false
+      apiKeyMasked.value = ''
+    } finally {
+      apiKeyLoading.value = false
+    }
+  }
+
+  async function saveApiKey(key) {
+    try {
+      apiKeyLoading.value = true
+      await axios.put(`${API_URL}/api/config/api-key`, { api_key: key })
+      await fetchApiKeyStatus()
+      return true
+    } catch (error) {
+      const detail = error.response?.data?.detail || 'Error al guardar la API key'
+      throw new Error(detail)
+    } finally {
+      apiKeyLoading.value = false
+    }
+  }
+
+  async function deleteApiKey() {
+    try {
+      apiKeyLoading.value = true
+      await axios.delete(`${API_URL}/api/config/api-key`)
+      apiKeyConfigured.value = false
+      apiKeyMasked.value = ''
+      return true
+    } catch (error) {
+      const detail = error.response?.data?.detail || 'Error al eliminar la API key'
+      throw new Error(detail)
+    } finally {
+      apiKeyLoading.value = false
+    }
+  }
+
   return {
     selectedFile,
     loading,
@@ -96,6 +149,9 @@ export const useExtractionStore = defineStore('extraction', () => {
     hasFile,
     hasError,
     isProcessing,
+    apiKeyConfigured,
+    apiKeyMasked,
+    apiKeyLoading,
     setFile,
     clearFile,
     setLoading,
@@ -106,6 +162,9 @@ export const useExtractionStore = defineStore('extraction', () => {
     clearExcel,
     setProgress,
     resetProgress,
-    clearAll
+    clearAll,
+    fetchApiKeyStatus,
+    saveApiKey,
+    deleteApiKey
   }
 })

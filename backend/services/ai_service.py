@@ -16,6 +16,7 @@ from google import genai
 from google.genai import types
 
 from services.document_prompts import get_prompt, get_all_document_types
+from services.api_key_store import get_api_key
 
 # Cargamos las variables de entorno desde el archivo .env
 # We load the environment variables from the .env file
@@ -25,26 +26,21 @@ logger = logging.getLogger(__name__)
 
 # Configuramos la conexión con Gemini usando el nuevo SDK
 # We configure the Gemini connection using the new SDK
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-
-# Instancia global del cliente (singleton)
-# Global client instance (singleton)
-_client_instance = None
 
 
 def get_client():
     """
-    Retorna la instancia del cliente Gemini (singleton pattern).
+    Retorna una instancia del cliente Gemini.
+    Lee la API key desde el store (archivo JSON o .env).
 
-    Returns the Gemini client instance (singleton pattern).
+    Returns a Gemini client instance.
+    Reads the API key from the store (JSON file or .env).
     """
-    global _client_instance
-    if _client_instance is None:
-        if not GEMINI_API_KEY:
-            raise ValueError("GEMINI_API_KEY no está configurada en .env")
-        _client_instance = genai.Client(api_key=GEMINI_API_KEY)
-    return _client_instance
+    api_key = get_api_key()
+    if not api_key:
+        raise ValueError("API key de Gemini no configurada. Configúrala desde la aplicación.")
+    return genai.Client(api_key=api_key)
 
 
 def extract_data_from_image(image_bytes: bytes,

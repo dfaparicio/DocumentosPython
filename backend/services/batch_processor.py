@@ -26,12 +26,12 @@ from services.data_merger import merge_face_data, merge_one_face_data, clean_mer
 from services.mixed_face_detector import is_likely_mixed_heuristic
 from services.data_validator import validate_extracted_data
 from services.document_prompts import get_retry_prompt
+from services.api_key_store import get_api_key
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # Unified prompt that classifies + extracts in a SINGLE call (Spanish prompt for Colombian ID documents)
@@ -436,10 +436,11 @@ async def process_pages_batch(
     Returns:
         List of PageResult with data for each page
     """
-    if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY no está configurada en .env")
+    api_key = get_api_key()
+    if not api_key:
+        raise ValueError("API key de Gemini no configurada. Configúrala desde la aplicación.")
 
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    client = genai.Client(api_key=api_key)
     semaphore = asyncio.Semaphore(max_concurrent)
 
     if progress:

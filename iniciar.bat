@@ -16,7 +16,7 @@ timeout /t 3 /nobreak >nul
 
 :: Iniciar Frontend (en ventana separada)
 echo [2/2] Iniciando Frontend (Vue.js)...
-start "Frontend - Vue.js" cmd /k "cd /d c:\Users\USUARIO\sena\DocumentosPython\frontend && npm run dev"
+start "Frontend - Vue.js" cmd /k "cd /d c:\Users\USUARIO\sena\DocumentosPython\frontend && pnpm run dev"
 
 :: Esperar 5 segundos y abrir el navegador
 timeout /t 5 /nobreak >nul

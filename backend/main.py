@@ -8,6 +8,7 @@ Main application entry point.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # Configurar logging al inicio de la aplicación
 # Configure logging at application startup
@@ -42,29 +43,24 @@ app.add_middleware(
 # This file contains the endpoint that processes PDFs
 from routers.extract_router import router as extract_router
 
-# Endpoint de prueba para verificar que el servidor está funcionando
-# Test endpoint to verify the server is running
-@app.get("/")
-async def root():
-    """
-    Endpoint raíz que muestra un mensaje de bienvenida.
-    Útil para verificar que el servidor está levantado correctamente.
-
-    Root endpoint that displays a welcome message.
-    Useful to verify the server is up and running.
-    """
-    return {
-        "mensaje": "API de Extracción de Datos de Cédulas",
-        "estado": "funcionando",
-        "version": "1.0.0",
-        "endpoints": {
-            "documentacion": "/docs",
-            "extraccion": "/extract/"
-        }
-    }
+# Importamos el router de configuración
+# Este archivo contiene los endpoints para gestionar la API key
+# Import the configuration router
+# This file contains the endpoints for managing the API key
+from routers.config_router import router as config_router
 
 # Incluimos el router en la aplicación
 # Esto hace que el endpoint /extract/ esté disponible
 # Include the router in the application
 # This makes the /extract/ endpoint available
 app.include_router(extract_router)
+
+# Incluimos el router de configuración
+# Esto hace que los endpoints /api/config/ estén disponibles
+# Include the configuration router
+# This makes the /api/config/ endpoints available
+app.include_router(config_router)
+
+# Servir frontend estático — va al FINAL para que no capture las rutas de la API
+# Serve frontend static files — goes at the END to avoid capturing API routes
+app.mount("/", StaticFiles(directory="static", html=True), name="static")

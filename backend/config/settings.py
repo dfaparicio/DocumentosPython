@@ -22,7 +22,7 @@ class Settings(BaseSettings):
 
     # API de Gemini
     # Gemini API
-    gemini_api_key: str = Field(..., env="GEMINI_API_KEY", description="API key de Google Gemini")
+    gemini_api_key: str = Field(default="", env="GEMINI_API_KEY", description="API key de Google Gemini")
     gemini_model: str = Field(
         default="gemini-2.5-flash",
         env="GEMINI_MODEL",
@@ -78,14 +78,6 @@ class Settings(BaseSettings):
     # Logging configuration
     log_level: str = Field(default="INFO", env="LOG_LEVEL", description="Nivel de logging")
     log_dir: str = Field(default="logs", env="LOG_DIR", description="Directorio de logs")
-
-    # Validar que gemini_api_key no esté vacía
-    # Validate that gemini_api_key is not empty
-    @validator("gemini_api_key")
-    def validate_gemini_api_key(cls, v):
-        if not v or v.strip() == "":
-            raise ValueError("GEMINI_API_KEY no puede estar vacía")
-        return v
 
     # Validar niveles de logging válidos
     # Validate valid logging levels
