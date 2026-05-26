@@ -216,7 +216,7 @@ def _format_document_type(document_type: str) -> str:
         document_type: Tipo de documento interno (ej: "cedula_ciudadania_vieja")
 
     Returns:
-        Tipo de documento formateado (ej: "Cédula de Ciudadanía Vieja")
+        Tipo de documento formateado (ej: "Cédula de Ciudadanía")
 
     Convert internal document type to readable format.
 
@@ -224,16 +224,17 @@ def _format_document_type(document_type: str) -> str:
         document_type: Internal document type (e.g.: "cedula_ciudadania_vieja")
 
     Returns:
-        Formatted document type (e.g.: "Cédula de Ciudadanía Vieja")
+        Formatted document type (e.g.: "Cédula de Ciudadanía")
     """
     type_mapping = {
-        "cedula_ciudadania_vieja": "Cédula de Ciudadanía Vieja",
-        "cedula_ciudadania_nueva": "Cédula de Ciudadanía Nueva",
+        "cedula_ciudadania_vieja": "Cédula de Ciudadanía",
+        "cedula_ciudadania_nueva": "Cédula de Ciudadanía",
         "cedula_digital": "Cédula Digital",
         "tarjeta_identidad": "Tarjeta de Identidad",
         "cedula_extranjeria": "Cédula de Extranjería",
         "pasaporte": "Pasaporte",
         "ppt": "Permiso PPT",
+        "contraseña": "Cédula de Ciudadanía",
         "otro": "Otro Documento"
     }
 

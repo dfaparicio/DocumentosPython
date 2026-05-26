@@ -67,7 +67,7 @@ INSTRUCCIONES ESPECÍFICAS:
 - FECHA DE NACIMIENTO: Formato DD/MM/YYYY con el año COMPLETO de 4 dígitos (ej: "15/03/1990", NO "15/03/199").
 - SEXO: "M" para masculino, "F" para femenino.
 - NACIONALIDAD: Para documentos colombianos SIEMPRE pon "COLOMBIANA". Solo pon algo diferente si el documento explícitamente dice otra nacionalidad (ej: cédula de extranjería puede tener otra).
-- TIPO DE DOCUMENTO: Usa nombre legible: "Cédula de Ciudadanía Vieja", "Cédula de Ciudadanía Nueva", "Cédula Digital", "Tarjeta de Identidad", "Cédula de Extranjería", "Pasaporte", "Permiso PPT", "Contraseña".
+- TIPO DE DOCUMENTO: Usa nombre legible: "Cédula de Ciudadanía", "Cédula Digital", "Tarjeta de Identidad", "Cédula de Extranjería", "Pasaporte", "Permiso PPT", "Contraseña".
 
 PARA CARAS TRASERAS:
 - Aún así extrae el NÚMERO DE DOCUMENTO si es visible (suele repetirse en el reverso).

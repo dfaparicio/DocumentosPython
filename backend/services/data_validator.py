@@ -15,9 +15,9 @@ from dataclasses import dataclass, field
 logger = logging.getLogger(__name__)
 
 VALID_DOCUMENT_TYPES = [
-    "Cédula de Ciudadanía Vieja", "Cédula de Ciudadanía Nueva",
+    "Cédula de Ciudadanía",
     "Cédula Digital", "Tarjeta de Identidad", "Cédula de Extranjería",
-    "Pasaporte", "Permiso PPT", "Contraseña", "Otro Documento"
+    "Pasaporte", "Permiso PPT", "Otro Documento"
 ]
 
 VALID_INTERNAL_DOC_TYPES = [

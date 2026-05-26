@@ -21,7 +21,7 @@ DOCUMENT_PROMPTS = {
     - NO busques lugar de expedición
 
     Extrae:
-    1. Tipo de Documento (ej: "Cédula de Ciudadanía Vieja")
+    1. Tipo de Documento (ej: "Cédula de Ciudadanía")
     2. Número de Documento (el número que aparece en esta cara)
     3. Nombres completos (si son visibles)
     4. Apellidos completos (si son visibles)
@@ -36,7 +36,7 @@ DOCUMENT_PROMPTS = {
     - Observa bien los datos en el formato antiguo de cédulas
 
     Ejemplo:
-    {"tipo_documento": "Cédula de Ciudadanía Vieja", "numero_documento": "12345678", "nombres": "Juan Carlos", "apellidos": "Pérez López", "fecha_nacimiento": "15/03/1990", "sexo": "M", "nacionalidad": "Colombiana"}
+    {"tipo_documento": "Cédula de Ciudadanía", "numero_documento": "12345678", "nombres": "Juan Carlos", "apellidos": "Pérez López", "fecha_nacimiento": "15/03/1990", "sexo": "M", "nacionalidad": "Colombiana"}
     """,
 
     "cedula_ciudadania_vieja_trasera": """
@@ -44,7 +44,7 @@ DOCUMENT_PROMPTS = {
     Extrae la información complementaria que aparece aquí.
 
     Extrae:
-    1. Tipo de Documento (ej: "Cédula de Ciudadanía Vieja")
+    1. Tipo de Documento (ej: "Cédula de Ciudadanía")
     2. Número de Documento (para verificar que coincida con frontal)
     3. Fecha de Expedición (si es visible)
     4. Lugar de Expedición (ej: "Bogotá D.C." si es visible)
@@ -58,7 +58,7 @@ DOCUMENT_PROMPTS = {
     - No agregues texto fuera del JSON
 
     Ejemplo:
-    {"tipo_documento": "Cédula de Ciudadanía Vieja", "numero_documento": "12345678", "fecha_expedicion": "10/01/2020", "lugar_expedicion": "Bogotá D.C.", "huella_digital": "PRESENTE", "firma": "PRESENTE"}
+    {"tipo_documento": "Cédula de Ciudadanía", "numero_documento": "12345678", "fecha_expedicion": "10/01/2020", "lugar_expedicion": "Bogotá D.C.", "huella_digital": "PRESENTE", "firma": "PRESENTE"}
     """,
 
     # ========== CÉDULA DE CIUDADANÍA NUEVA ==========
@@ -73,7 +73,7 @@ DOCUMENT_PROMPTS = {
     - NO busques lugar de expedición
 
     Extrae:
-    1. Tipo de Documento (ej: "Cédula de Ciudadanía Nueva")
+    1. Tipo de Documento (ej: "Cédula de Ciudadanía")
     2. Número de Documento (el número que aparece en esta cara)
     3. Nombres completos (si son visibles)
     4. Apellidos completos (si son visibles)
@@ -88,7 +88,7 @@ DOCUMENT_PROMPTS = {
     - Observa el diseño moderno de la cédula
 
     Ejemplo:
-    {"tipo_documento": "Cédula de Ciudadanía Nueva", "numero_documento": "12345678", "nombres": "Juan Carlos", "apellidos": "Pérez López", "fecha_nacimiento": "15/03/1990", "sexo": "M", "nacionalidad": "Colombiana"}
+    {"tipo_documento": "Cédula de Ciudadanía", "numero_documento": "12345678", "nombres": "Juan Carlos", "apellidos": "Pérez López", "fecha_nacimiento": "15/03/1990", "sexo": "M", "nacionalidad": "Colombiana"}
     """,
 
     "cedula_ciudadania_nueva_trasera": """
@@ -96,7 +96,7 @@ DOCUMENT_PROMPTS = {
     Extrae la información complementaria que aparece aquí.
 
     Extrae:
-    1. Tipo de Documento (ej: "Cédula de Ciudadanía Nueva")
+    1. Tipo de Documento (ej: "Cédula de Ciudadanía")
     2. Número de Documento (para verificar que coincida con frontal)
     3. Fecha de Expedición (si es visible)
     4. Lugar de Expedición (ej: "Bogotá D.C." si es visible)
@@ -111,7 +111,7 @@ DOCUMENT_PROMPTS = {
     - No agregues texto fuera del JSON
 
     Ejemplo:
-    {"tipo_documento": "Cédula de Ciudadanía Nueva", "numero_documento": "12345678", "fecha_expedicion": "10/01/2020", "lugar_expedicion": "Bogotá D.C.", "huella_digital": "PRESENTE", "firma": "PRESENTE", "datos_biometricos": "CHIP"}
+    {"tipo_documento": "Cédula de Ciudadanía", "numero_documento": "12345678", "fecha_expedicion": "10/01/2020", "lugar_expedicion": "Bogotá D.C.", "huella_digital": "PRESENTE", "firma": "PRESENTE", "datos_biometricos": "CHIP"}
     """,
 
     # ========== CÉDULA DIGITAL ==========
@@ -532,6 +532,7 @@ def get_all_document_types() -> list:
         "cedula_extranjeria",
         "pasaporte",
         "ppt",
+        "contraseña",
         "otro"
     ]
 
@@ -554,5 +555,6 @@ def get_one_face_document_types() -> list:
     return [
         "pasaporte",
         "ppt",
+        "contraseña",
         "otro"
     ]

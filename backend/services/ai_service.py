@@ -219,13 +219,14 @@ def _format_document_type(document_type: str) -> str:
     Converts the internal document type to a human-readable format.
     """
     type_mapping = {
-        "cedula_ciudadania_vieja": "Cédula de Ciudadanía Vieja",
-        "cedula_ciudadania_nueva": "Cédula de Ciudadanía Nueva",
+        "cedula_ciudadania_vieja": "Cédula de Ciudadanía",
+        "cedula_ciudadania_nueva": "Cédula de Ciudadanía",
         "cedula_digital": "Cédula Digital",
         "tarjeta_identidad": "Tarjeta de Identidad",
         "cedula_extranjeria": "Cédula de Extranjería",
         "pasaporte": "Pasaporte",
         "ppt": "Permiso PPT",
+        "contraseña": "Cédula de Ciudadanía",
         "otro": "Otro Documento"
     }
     return type_mapping.get(document_type, document_type.replace("_", " ").title())

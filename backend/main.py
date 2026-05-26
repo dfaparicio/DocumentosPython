@@ -63,4 +63,4 @@ app.include_router(config_router)
 
 # Servir frontend estático — va al FINAL para que no capture las rutas de la API
 # Serve frontend static files — goes at the END to avoid capturing API routes
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")

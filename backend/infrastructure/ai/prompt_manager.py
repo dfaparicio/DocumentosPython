@@ -198,13 +198,14 @@ Considera:
         # Mapear tipos a nombres legibles
         # Map types to readable names
         type_names = {
-            "cedula_ciudadania_vieja": "Cédula de Ciudadanía Vieja",
-            "cedula_ciudadania_nueva": "Cédula de Ciudadanía Nueva",
+            "cedula_ciudadania_vieja": "Cédula de Ciudadanía",
+            "cedula_ciudadania_nueva": "Cédula de Ciudadanía",
             "cedula_digital": "Cédula Digital",
             "tarjeta_identidad": "Tarjeta de Identidad",
             "cedula_extranjeria": "Cédula de Extranjería",
             "pasaporte": "Pasaporte",
             "ppt": "Permiso PPT",
+            "contraseña": "Cédula de Ciudadanía",
             "otro": "Otro Documento"
         }
 

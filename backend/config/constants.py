@@ -11,13 +11,14 @@ from typing import Dict, List
 # Mapeo de tipos de documento interno a formato legible
 # Mapping of internal document types to readable format
 DOCUMENT_TYPES: Dict[str, str] = {
-    "cedula_ciudadania_vieja": "Cédula de Ciudadanía Vieja",
-    "cedula_ciudadania_nueva": "Cédula de Ciudadanía Nueva",
+    "cedula_ciudadania_vieja": "Cédula de Ciudadanía",
+    "cedula_ciudadania_nueva": "Cédula de Ciudadanía",
     "cedula_digital": "Cédula Digital",
     "tarjeta_identidad": "Tarjeta de Identidad",
     "cedula_extranjeria": "Cédula de Extranjería",
     "pasaporte": "Pasaporte",
     "ppt": "Permiso PPT",
+    "contraseña": "Cédula de Ciudadanía",
     "otro": "Otro Documento"
 }
 

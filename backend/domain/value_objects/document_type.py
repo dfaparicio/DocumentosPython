@@ -22,6 +22,7 @@ class DocumentTypeVO(Enum):
     CEDULA_EXTRANJERIA = "cedula_extranjeria"
     PASAPORTE = "pasaporte"
     PPT = "ppt"
+    CONTRASENA = "contraseña"
     OTRO = "otro"
 
     @classmethod
@@ -43,6 +44,7 @@ class DocumentTypeVO(Enum):
         return [
             cls.PASAPORTE,
             cls.PPT,
+            cls.CONTRASENA,
             cls.OTRO
         ]
 
@@ -71,13 +73,14 @@ class DocumentTypeVO(Enum):
             Nombre legible del tipo de documento / Readable name of the document type
         """
         display_names = {
-            self.CEDULA_CIUDADANIA_VIEJA: "Cédula de Ciudadanía Vieja",
-            self.CEDULA_CIUDADANIA_NUEVA: "Cédula de Ciudadanía Nueva",
+            self.CEDULA_CIUDADANIA_VIEJA: "Cédula de Ciudadanía",
+            self.CEDULA_CIUDADANIA_NUEVA: "Cédula de Ciudadanía",
             self.CEDULA_DIGITAL: "Cédula Digital",
             self.TARJETA_IDENTIDAD: "Tarjeta de Identidad",
             self.CEDULA_EXTRANJERIA: "Cédula de Extranjería",
             self.PASAPORTE: "Pasaporte",
             self.PPT: "Permiso PPT",
+            self.CONTRASENA: "Cédula de Ciudadanía",
             self.OTRO: "Otro Documento"
         }
         return display_names.get(self, self.value.replace("_", " ").title())
