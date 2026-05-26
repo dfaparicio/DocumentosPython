@@ -24,7 +24,7 @@ export const useExtractionStore = defineStore('extraction', () => {
   })
 
   // API Key state
-  const apiKeyConfigured = ref(false)
+  const apiKeyConfigured = ref(true)
   const apiKeyMasked = ref('')
   const apiKeyLoading = ref(false)
 
@@ -93,49 +93,9 @@ export const useExtractionStore = defineStore('extraction', () => {
     resetProgress()
   }
 
-  // API Key actions
+  // API Key actions (deprecated - now uses .env)
   async function fetchApiKeyStatus() {
-    try {
-      apiKeyLoading.value = true
-      const response = await axios.get(`${API_URL}/api/config/api-key`)
-      apiKeyConfigured.value = response.data.configured
-      apiKeyMasked.value = response.data.masked || ''
-    } catch (error) {
-      console.error('Error al obtener estado de API key:', error)
-      apiKeyConfigured.value = false
-      apiKeyMasked.value = ''
-    } finally {
-      apiKeyLoading.value = false
-    }
-  }
-
-  async function saveApiKey(key) {
-    try {
-      apiKeyLoading.value = true
-      await axios.put(`${API_URL}/api/config/api-key`, { api_key: key })
-      await fetchApiKeyStatus()
-      return true
-    } catch (error) {
-      const detail = error.response?.data?.detail || 'Error al guardar la API key'
-      throw new Error(detail)
-    } finally {
-      apiKeyLoading.value = false
-    }
-  }
-
-  async function deleteApiKey() {
-    try {
-      apiKeyLoading.value = true
-      await axios.delete(`${API_URL}/api/config/api-key`)
-      apiKeyConfigured.value = false
-      apiKeyMasked.value = ''
-      return true
-    } catch (error) {
-      const detail = error.response?.data?.detail || 'Error al eliminar la API key'
-      throw new Error(detail)
-    } finally {
-      apiKeyLoading.value = false
-    }
+    apiKeyConfigured.value = true
   }
 
   return {
@@ -163,8 +123,6 @@ export const useExtractionStore = defineStore('extraction', () => {
     setProgress,
     resetProgress,
     clearAll,
-    fetchApiKeyStatus,
-    saveApiKey,
-    deleteApiKey
+    fetchApiKeyStatus
   }
 })

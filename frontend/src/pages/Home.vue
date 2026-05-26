@@ -11,72 +11,6 @@
         </p>
       </header>
 
-      <!-- API Key Configuration Panel -->
-      <div class="api-key-panel">
-        <div class="api-key-header" @click="showApiKeyPanel = !showApiKeyPanel">
-          <svg class="api-key-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
-          </svg>
-          <span class="api-key-title">Configuración de API Key</span>
-          <span v-if="apiKeyConfigured" class="api-key-badge badge-ok">Configurada</span>
-          <span v-else class="api-key-badge badge-missing">No configurada</span>
-          <svg class="chevron" :class="{ rotated: showApiKeyPanel }" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-          </svg>
-        </div>
-
-        <div v-if="showApiKeyPanel" class="api-key-body">
-          <!-- Key is configured -->
-          <div v-if="apiKeyConfigured" class="api-key-configured">
-            <p class="api-key-info">
-              API Key activa: <code class="masked-key">{{ apiKeyMasked }}</code>
-            </p>
-            <div class="api-key-actions">
-              <button class="btn btn-secondary btn-sm" @click="startChangeKey">
-                Cambiar
-              </button>
-              <button class="btn btn-danger btn-sm" @click="handleDeleteKey" :disabled="apiKeyLoading">
-                Eliminar
-              </button>
-            </div>
-          </div>
-
-          <!-- Key is NOT configured -->
-          <div v-else class="api-key-missing">
-            <p class="api-key-info">
-              Necesitas una API key de Google Gemini para usar la extracción.
-              <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" class="link">
-                Obtener API key gratuita
-              </a>
-            </p>
-          </div>
-
-          <!-- Input form (shown when changing or adding) -->
-          <div v-if="showKeyInput" class="api-key-form">
-            <input
-              v-model="newApiKey"
-              type="password"
-              placeholder="AIza..."
-              class="api-key-input"
-              @keydown.enter="handleSaveKey"
-            />
-            <div class="api-key-form-actions">
-              <button
-                class="btn btn-primary btn-sm"
-                @click="handleSaveKey"
-                :disabled="!newApiKey.trim() || apiKeyLoading"
-              >
-                {{ apiKeyLoading ? 'Guardando...' : 'Guardar' }}
-              </button>
-              <button class="btn btn-secondary btn-sm" @click="cancelKeyInput">
-                Cancelar
-              </button>
-            </div>
-            <p v-if="apiKeyError" class="api-key-error">{{ apiKeyError }}</p>
-          </div>
-        </div>
-      </div>
-
       <!-- Main Content -->
       <div class="main-content" :class="{ 'has-results': excelFile && !loading }">
         <!-- Upload Column (centered when alone, left when results exist) -->
@@ -140,13 +74,13 @@
             <button
               v-if="selectedFile"
               class="btn btn-primary process-btn"
-              :disabled="loading || !apiKeyConfigured"
+              :disabled="loading"
               @click="processFile"
             >
               <svg v-if="!loading" class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1m-4 0v1m0-1H3"/>
               </svg>
-              <span v-if="!loading">{{ apiKeyConfigured ? 'Extraer Datos' : 'Configura la API Key primero' }}</span>
+              <span v-if="!loading">Extraer Datos</span>
               <span v-else>Procesando...</span>
             </button>
 
@@ -288,63 +222,15 @@ const isDragging = ref(false)
 const errorMessage = ref('')
 const fileInput = ref(null)
 
-// API Key UI state
-const showApiKeyPanel = ref(false)
-const showKeyInput = ref(false)
-const newApiKey = ref('')
-const apiKeyError = ref('')
-
 const selectedFile = computed(() => store.selectedFile)
 const loading = computed(() => store.loading)
 const excelFile = computed(() => store.excelFile)
 const successMessage = computed(() => store.successMessage)
 const progress = computed(() => store.progress)
-const apiKeyConfigured = computed(() => store.apiKeyConfigured)
-const apiKeyMasked = computed(() => store.apiKeyMasked)
-const apiKeyLoading = computed(() => store.apiKeyLoading)
 
-// Fetch API key status on mount
-onMounted(async () => {
-  await store.fetchApiKeyStatus()
-  // Auto-show panel if key is not configured
-  if (!store.apiKeyConfigured) {
-    showApiKeyPanel.value = true
-  }
+onMounted(() => {
+  store.fetchApiKeyStatus()
 })
-
-function startChangeKey() {
-  showKeyInput.value = true
-  newApiKey.value = ''
-  apiKeyError.value = ''
-}
-
-function cancelKeyInput() {
-  showKeyInput.value = false
-  newApiKey.value = ''
-  apiKeyError.value = ''
-}
-
-async function handleSaveKey() {
-  if (!newApiKey.value.trim()) return
-  apiKeyError.value = ''
-  try {
-    await store.saveApiKey(newApiKey.value.trim())
-    showKeyInput.value = false
-    newApiKey.value = ''
-  } catch (error) {
-    apiKeyError.value = error.message
-  }
-}
-
-async function handleDeleteKey() {
-  if (!confirm('¿Eliminar la API key? No podrás procesar PDFs hasta que la configures de nuevo.')) return
-  try {
-    await store.deleteApiKey()
-    showKeyInput.value = true
-  } catch (error) {
-    apiKeyError.value = error.message
-  }
-}
 
 function onDragOver() {
   isDragging.value = true
@@ -395,12 +281,6 @@ async function processFile() {
     return
   }
 
-  if (!store.apiKeyConfigured) {
-    showApiKeyPanel.value = true
-    showKeyInput.value = true
-    return
-  }
-
   try {
     await extractFromPdf(store.selectedFile)
   } catch (error) {
@@ -445,169 +325,6 @@ function formatFileSize(bytes) {
   max-width: 700px;
   margin: 0 auto;
   line-height: 1.6;
-}
-
-/* API Key Panel */
-.api-key-panel {
-  max-width: 600px;
-  margin: 0 auto 24px;
-  background: white;
-  border: 1px solid var(--gray-200);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.api-key-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 20px;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.2s;
-}
-
-.api-key-header:hover {
-  background: var(--gray-50);
-}
-
-.api-key-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--gray-500);
-  flex-shrink: 0;
-}
-
-.api-key-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--gray-700);
-  flex: 1;
-}
-
-.api-key-badge {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 2px 10px;
-  border-radius: 20px;
-}
-
-.badge-ok {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.badge-missing {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.chevron {
-  width: 16px;
-  height: 16px;
-  color: var(--gray-400);
-  transition: transform 0.2s;
-  flex-shrink: 0;
-}
-
-.chevron.rotated {
-  transform: rotate(180deg);
-}
-
-.api-key-body {
-  padding: 0 20px 16px;
-  border-top: 1px solid var(--gray-100);
-}
-
-.api-key-configured {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 14px;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.api-key-info {
-  font-size: 14px;
-  color: var(--gray-600);
-  margin: 0;
-}
-
-.masked-key {
-  background: var(--gray-100);
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 13px;
-}
-
-.api-key-missing {
-  padding-top: 14px;
-}
-
-.link {
-  color: #4f46e5;
-  text-decoration: underline;
-}
-
-.api-key-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.api-key-form {
-  padding-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.api-key-input {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid var(--gray-300);
-  border-radius: 8px;
-  font-size: 14px;
-  font-family: monospace;
-  outline: none;
-  transition: border-color 0.2s;
-  box-sizing: border-box;
-}
-
-.api-key-input:focus {
-  border-color: #4f46e5;
-}
-
-.api-key-form-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.api-key-error {
-  color: #dc2626;
-  font-size: 13px;
-  margin: 0;
-}
-
-.btn-sm {
-  padding: 6px 14px;
-  font-size: 13px;
-}
-
-.btn-danger {
-  background: #fee2e2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: #fecaca;
-}
-
-.btn-danger:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* Main Content */

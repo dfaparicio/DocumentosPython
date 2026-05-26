@@ -26,7 +26,6 @@ from services.data_merger import merge_face_data, merge_one_face_data, clean_mer
 from services.mixed_face_detector import is_likely_mixed_heuristic
 from services.data_validator import validate_extracted_data
 from services.document_prompts import get_retry_prompt
-from services.api_key_store import get_api_key
 
 load_dotenv()
 
@@ -436,9 +435,9 @@ async def process_pages_batch(
     Returns:
         List of PageResult with data for each page
     """
-    api_key = get_api_key()
+    api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key:
-        raise ValueError("API key de Gemini no configurada. Configúrala desde la aplicación.")
+        raise ValueError("API key de Gemini no configurada. Agrega GEMINI_API_KEY al archivo .env")
 
     client = genai.Client(api_key=api_key)
     semaphore = asyncio.Semaphore(max_concurrent)

@@ -43,23 +43,11 @@ app.add_middleware(
 # This file contains the endpoint that processes PDFs
 from routers.extract_router import router as extract_router
 
-# Importamos el router de configuración
-# Este archivo contiene los endpoints para gestionar la API key
-# Import the configuration router
-# This file contains the endpoints for managing the API key
-from routers.config_router import router as config_router
-
 # Incluimos el router en la aplicación
 # Esto hace que el endpoint /extract/ esté disponible
 # Include the router in the application
 # This makes the /extract/ endpoint available
 app.include_router(extract_router)
-
-# Incluimos el router de configuración
-# Esto hace que los endpoints /api/config/ estén disponibles
-# Include the configuration router
-# This makes the /api/config/ endpoints available
-app.include_router(config_router)
 
 # Servir frontend estático — va al FINAL para que no capture las rutas de la API
 # Serve frontend static files — goes at the END to avoid capturing API routes

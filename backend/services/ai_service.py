@@ -16,7 +16,6 @@ from google import genai
 from google.genai import types
 
 from services.document_prompts import get_prompt, get_all_document_types
-from services.api_key_store import get_api_key
 
 # Cargamos las variables de entorno desde el archivo .env
 # We load the environment variables from the .env file
@@ -37,9 +36,9 @@ def get_client():
     Returns a Gemini client instance.
     Reads the API key from the store (JSON file or .env).
     """
-    api_key = get_api_key()
+    api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key:
-        raise ValueError("API key de Gemini no configurada. Configúrala desde la aplicación.")
+        raise ValueError("API key de Gemini no configurada. Agrega GEMINI_API_KEY al archivo .env")
     return genai.Client(api_key=api_key)
 
 
