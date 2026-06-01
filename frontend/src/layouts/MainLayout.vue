@@ -4,42 +4,9 @@
 -->
 <template>
   <q-layout view="hHh lpR fFf">
-    <!-- Header de la aplicación -->
-    <q-header class="bg-primary text-white">
-      <!-- Toolbar principal -->
-      <q-toolbar class="q-py-sm">
-        <!-- Icono y título de la aplicación -->
-        <q-toolbar-title>
-          <div class="row items-center no-wrap">
-            <q-icon
-              name="description_scanner"
-              size="32px"
-              class="q-mr-sm"
-            />
-            <span class="text-h5 text-weight-medium">
-              Extractor de Cédulas
-            </span>
-          </div>
-        </q-toolbar-title>
-
-        <!-- Espaciador para separar elementos -->
-        <q-space />
-
-        <!-- Icono de información con tooltip -->
-        <q-btn
-          flat
-          dense
-          round
-          icon="info"
-          @click="showInfo"
-        >
-          <q-tooltip>Información sobre la aplicación</q-tooltip>
-        </q-btn>
-      </q-toolbar>
-
-      <!-- Barra de progreso cuando está cargando -->
+    <!-- Barra de progreso cuando está cargando -->
+    <q-header v-if="store.loading" class="bg-transparent" style="box-shadow: none;">
       <q-linear-progress
-        v-if="store.loading"
         indeterminate
         color="accent"
         size="3px"
