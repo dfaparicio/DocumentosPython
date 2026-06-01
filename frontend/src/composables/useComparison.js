@@ -7,40 +7,6 @@ export function useComparison() {
   const store = useComparisonStore()
 
   /**
-   * Mezcla un Excel y devuelve la versión con filas aleatorias.
-   */
-  const shuffleExcel = async (file) => {
-    try {
-      store.setLoading(true, 'Mezclando filas...')
-
-      const formData = new FormData()
-      formData.append('file', file)
-
-      const response = await axios.post(`${API_URL}/compare/shuffle`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        responseType: 'blob',
-      })
-
-      const now = new Date()
-      const dateStr = now.toISOString().split('T')[0]
-      const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-')
-      const fileName = `documentos_mezclados_${dateStr}_${timeStr}.xlsx`
-
-      store.setShuffledFile(response.data, fileName)
-      store.setSuccess('✅ Excel mezclado correctamente. Se descargó automáticamente.')
-
-      // Auto-descargar
-      _downloadBlob(response.data, fileName)
-
-    } catch (err) {
-      console.error('Error al mezclar:', err)
-      store.setError(_extractErrorMessage(err))
-    } finally {
-      store.setLoading(false)
-    }
-  }
-
-  /**
    * Compara dos archivos Excel. Devuelve JSON con stats y discrepancias.
    */
   const reconcileFiles = async (fileA, fileB) => {
@@ -62,10 +28,12 @@ export function useComparison() {
       store.setReconciliationResult(data)
 
       if (data.all_clear) {
-        store.setSuccess('✅ Sin incongruencias — Todos los datos coinciden.')
+        store.setSuccess('✅ Ambos archivos contienen exactamente las mismas cédulas.')
       } else {
-        const total = data.stats.campos_diferentes
-        store.setSuccess(`⚠️ Se encontraron ${total} inconsistencia(s) en los datos.`)
+        const soloEn1 = data.stats.solo_en_1 || 0
+        const soloEn2 = data.stats.solo_en_2 || 0
+        const total = soloEn1 + soloEn2
+        store.setSuccess(`⚠️ ${total} cédula(s) no coinciden entre los archivos.`)
       }
 
     } catch (err) {
@@ -111,7 +79,6 @@ export function useComparison() {
   }
 
   return {
-    shuffleExcel,
     reconcileFiles,
     downloadReport,
   }

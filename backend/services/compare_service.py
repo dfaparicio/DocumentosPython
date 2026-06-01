@@ -9,9 +9,8 @@ Compares data by matching document numbers and reports discrepancies.
 import io
 import re
 import logging
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Optional
 from dataclasses import dataclass, field
-from collections import defaultdict
 
 import pandas as pd
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -48,19 +47,60 @@ COMPARE_FIELDS = [
     ("nacionalidad", "Nacionalidad"),
 ]
 
-# Mapeo de columnas del Excel a claves internas
-COLUMN_MAP = {
-    "no.": "no",
-    "tipo de documento": "tipo_documento",
-    "numero de documento": "numero_documento",
-    "nombres": "nombres",
-    "apellidos": "apellidos",
-    "fecha de nacimiento": "fecha_nacimiento",
-    "sexo": "sexo",
-    "nacionalidad": "nacionalidad",
-    "estado": "estado",
-    "pagina origen": "pagina_origen",
-    "confianza": "confianza",
+# Aliases de columnas: múltiples nombres posibles para cada campo interno
+# Permite comparar Excels con diferentes nombres de columnas
+# Column aliases: multiple possible names for each internal field
+COLUMN_ALIASES = {
+    "no": [
+        "no.", "no", "numero", "consecutivo", "#", "item", "num",
+    ],
+    "tipo_documento": [
+        "tipo de documento", "tipo documento", "tipo doc",
+        "tipo", "clase de documento", "clase documento",
+        "tipo de doc", "td", "tipodoc",
+        # Alias del archivo externo (SENA / registros externos)
+        "tipo de identificacion", "tipo identificacion",
+        "tipo id", "tipo de id",
+    ],
+    "numero_documento": [
+        "numero de documento", "numero documento", "num documento",
+        "cedula", "documento", "no. documento", "no documento",
+        "numero de cedula", "numero cedula",
+        "cc", "nit", "dni", "cedula de ciudadania",
+        "identificacion", "numero de identificacion",
+        "num identificacion", "numero identificacion",
+        "doc", "doc identidad", "documento de identidad",
+        "numero de cc", "no. cc", "ced",
+    ],
+    "nombres": [
+        "nombres", "nombre", "nombre(s)", "primer nombre",
+        "name", "nomb", "nom", "name(s)",
+    ],
+    "apellidos": [
+        "apellidos", "apellido", "apellido(s)", "primer apellido",
+        "last name", "ape", "ape(s)",
+    ],
+    "fecha_nacimiento": [
+        "fecha de nacimiento", "fecha nacimiento", "f. nacimiento",
+        "fn", "fecha nac", "nacimiento", "fecha de nac",
+        "f. nac", "born", "birthdate", "birth date",
+        "fecha", "f.n",
+    ],
+    "sexo": [
+        "sexo", "genero", "sex", "g", "gen",
+    ],
+    "nacionalidad": [
+        "nacionalidad", "nacion", "nacional", "nationality",
+    ],
+    "estado": [
+        "estado", "status", "state",
+    ],
+    "pagina_origen": [
+        "pagina origen", "pagina", "hoja origen", "page", "pag",
+    ],
+    "confianza": [
+        "confianza", "confidence", "conf",
+    ],
 }
 
 
@@ -127,45 +167,182 @@ def _normalize_col_name(col: str) -> str:
     return re.sub(r'\s+', ' ', col)
 
 
+def _match_columns(excel_columns: List[str]) -> Dict[str, str]:
+    """
+    Dado los nombres de columnas del Excel (ya normalizados),
+    busca coincidencias contra los aliases y retorna {clave_interna: nombre_columna_excel}.
+
+    Given Excel column names (already normalized),
+    matches against aliases and returns {internal_key: excel_column_name}.
+    """
+    matched = {}
+    used_cols = set()
+
+    for key, alias_list in COLUMN_ALIASES.items():
+        for alias in alias_list:
+            alias_norm = _normalize_col_name(alias)
+            alias_no_spaces = alias_norm.replace(" ", "")
+            for col in excel_columns:
+                col_no_spaces = col.replace(" ", "")
+                if col not in used_cols and (col == alias_norm or col_no_spaces == alias_no_spaces):
+                    matched[key] = col
+                    used_cols.add(col)
+                    break
+            if key in matched:
+                break
+
+    return matched
+
+
+def _auto_detect_doc_column(df, matched: Dict[str, str]) -> Optional[str]:
+    """
+    Si no se encontró la columna de documento por alias,
+    busca la primera columna que tenga valores que parezcan números de cédula (6+ dígitos).
+
+    If the document column wasn't found by alias,
+    finds the first column with values that look like ID numbers (6+ digits).
+    """
+    if "numero_documento" in matched:
+        return None
+
+    used_cols = set(matched.values())
+    for col in df.columns:
+        if col in used_cols:
+            continue
+        # Verificar si la mayoría de valores parecen números de documento
+        numeric_count = 0
+        sample = df[col].dropna().head(20)
+        for val in sample:
+            val_str = _clean_value(val)
+            # Número de cédula: 6-12 dígitos, puede tener puntos
+            digits = re.sub(r'[.\s\-]', '', val_str)
+            if digits.isdigit() and 6 <= len(digits) <= 15:
+                numeric_count += 1
+        if len(sample) > 0 and numeric_count / len(sample) >= 0.5:
+            logger.info(f"Autodetección: columna '{col}' parece ser numero_documento")
+            return col
+
+    return None
+
+
+def _detect_header_row(file_bytes: bytes, sheet_name) -> int:
+    """
+    Detecta la fila del encabezado en un Excel.
+    Algunos archivos tienen filas de título antes de los encabezados reales.
+    Busca la primera fila que contenga nombres de columna reconocidos.
+
+    Detects the header row in an Excel file.
+    Some files have title rows before the actual headers.
+    Finds the first row containing recognized column names.
+    """
+    # Leer las primeras filas sin encabezado para inspeccionar
+    try:
+        df_raw = pd.read_excel(
+            io.BytesIO(file_bytes), sheet_name=sheet_name,
+            header=None, nrows=10
+        )
+    except Exception:
+        return 0
+
+    # Construir set de todos los aliases normalizados
+    all_aliases = set()
+    for alias_list in COLUMN_ALIASES.values():
+        for alias in alias_list:
+            all_aliases.add(_normalize_col_name(alias))
+
+    best_row = 0
+    best_matches = 0
+
+    for row_idx in range(min(8, len(df_raw))):
+        row_values = df_raw.iloc[row_idx]
+        match_count = 0
+        for val in row_values:
+            if pd.isna(val):
+                continue
+            normalized = _normalize_col_name(str(val))
+            # Verificar si coincide con algún alias conocido
+            if normalized in all_aliases:
+                match_count += 1
+            else:
+                # Verificar sin espacios también
+                no_spaces = normalized.replace(" ", "")
+                for alias in all_aliases:
+                    if alias.replace(" ", "") == no_spaces:
+                        match_count += 1
+                        break
+
+        if match_count > best_matches:
+            best_matches = match_count
+            best_row = row_idx
+
+    logger.info(
+        f"Detección de encabezado: fila {best_row} con {best_matches} "
+        f"coincidencias de columnas conocidas"
+    )
+    return best_row
+
+
 def parse_excel_for_comparison(file_bytes: bytes) -> List[Dict]:
     """
     Lee un Excel y extrae los datos normalizados para comparación.
+    Soporta cualquier nombre de columna — usa aliases flexibles para encontrar cada campo.
+    Detecta automáticamente la fila de encabezados (soporta archivos con títulos previos).
 
     Reads an Excel and extracts normalized data for comparison.
+    Supports any column name — uses flexible aliases to find each field.
+    Auto-detects the header row (supports files with title rows before headers).
     """
+    # Determinar la hoja a usar
+    sheet_name = "Documentos"
     try:
-        df = pd.read_excel(io.BytesIO(file_bytes), sheet_name="Documentos")
+        pd.read_excel(io.BytesIO(file_bytes), sheet_name=sheet_name, nrows=0)
     except Exception:
-        # Si no tiene hoja "Documentos", intentar la primera hoja
-        df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=0)
+        sheet_name = 0
+
+    # Detectar la fila del encabezado automáticamente
+    header_row = _detect_header_row(file_bytes, sheet_name)
+
+    logger.info(f"Leyendo Excel con header en fila {header_row}, hoja='{sheet_name}'")
+    df = pd.read_excel(
+        io.BytesIO(file_bytes), sheet_name=sheet_name, header=header_row
+    )
 
     # Normalizar nombres de columnas (sin acentos, sin espacios extra)
-    df.columns = [_normalize_col_name(col) for col in df.columns]
+    df.columns = [_normalize_col_name(str(col)) for col in df.columns]
 
     logger.info(f"Columnas detectadas en Excel: {list(df.columns)}")
     logger.info(f"Total filas: {len(df)}")
 
-    # También normalizar las claves de COLUMN_MAP para el matching
-    normalized_map = {_normalize_col_name(k): v for k, v in COLUMN_MAP.items()}
+    # Matching flexible de columnas por aliases
+    col_mapping = _match_columns(list(df.columns))
+
+    # Autodetección de columna de documento si no se encontró por alias
+    auto_doc_col = _auto_detect_doc_column(df, col_mapping)
+    if auto_doc_col:
+        col_mapping["numero_documento"] = auto_doc_col
+
+    logger.info(f"Mapeo de columnas: {col_mapping}")
 
     # Mapear columnas
     records = []
+    all_keys = set(COLUMN_ALIASES.keys())
     for _, row in df.iterrows():
         record = {}
-        for col_name, key in normalized_map.items():
-            if col_name in df.columns:
-                record[key] = _clean_value(row.get(col_name, ""))
+        for key in all_keys:
+            if key in col_mapping:
+                record[key] = _clean_value(row.get(col_mapping[key], ""))
             else:
                 record[key] = ""
 
         # Normalizar número de documento para emparejamiento
         record["_doc_normalized"] = _normalize_doc_number(record.get("numero_documento", ""))
 
-        records.append(record)
+        # Solo agregar registros que tengan número de documento
+        if record["_doc_normalized"]:
+            records.append(record)
 
     # Log de diagnóstico: mostrar cuántos registros tienen número de documento
-    with_doc = sum(1 for r in records if r.get("_doc_normalized"))
-    logger.info(f"Registros parseados: {len(records)}, con numero_documento: {with_doc}")
+    logger.info(f"Registros parseados con numero_documento: {len(records)}")
 
     # Log de los primeros 3 documentos normalizados para diagnóstico
     for i, r in enumerate(records[:3]):
@@ -266,122 +443,113 @@ def _remove_accents(text: str) -> str:
 
 def reconcile(file_a_data: List[Dict], file_b_data: List[Dict]) -> ReconciliationResult:
     """
-    Reconcilia dos conjuntos de datos emparejando por número de documento.
-    Compara campo a campo con tolerancia (mayúsculas, acentos, formato fecha).
+    Reconcilia dos conjuntos de datos comparando por número de documento (cédula).
+    Verifica que ambos archivos tengan exactamente las mismas cédulas,
+    sin importar el orden. A y B son intercambiables.
 
-    Reconciles two datasets by matching document numbers.
-    Compares field by field with tolerance (case, accents, date format).
+    Reconciles two datasets by comparing document numbers.
+    Verifies that both files have exactly the same document numbers,
+    regardless of order. A and B are interchangeable.
     """
     result = ReconciliationResult()
 
-    # Indexar por número de documento normalizado (listas para soportar duplicados)
-    index_a = defaultdict(list)
+    # Extraer cédulas normalizadas de cada archivo (como sets para comparación)
+    docs_a = {}
     for record in file_a_data:
         doc = record.get("_doc_normalized", "")
         if doc:
-            index_a[doc].append(record)
-        else:
-            # Registros sin número de documento van directo a only_in_a
-            result.only_in_a.append(record)
+            docs_a[doc] = record
 
-    index_b = defaultdict(list)
+    docs_b = {}
     for record in file_b_data:
         doc = record.get("_doc_normalized", "")
         if doc:
-            index_b[doc].append(record)
-        else:
-            # Registros sin número de documento van directo a only_in_b
-            result.only_in_b.append(record)
+            docs_b[doc] = record
+
+    set_a = set(docs_a.keys())
+    set_b = set(docs_b.keys())
 
     logger.info(
-        f"Índices: A tiene {len(index_a)} cédulas únicas, "
-        f"B tiene {len(index_b)} cédulas únicas"
+        f"Archivo 1 tiene {len(set_a)} cédulas únicas, "
+        f"Archivo 2 tiene {len(set_b)} cédulas únicas"
     )
-    # Log primeros 5 docs de cada índice para diagnóstico
-    logger.debug(f"  Docs A (muestra): {list(index_a.keys())[:5]}")
-    logger.debug(f"  Docs B (muestra): {list(index_b.keys())[:5]}")
+    logger.debug(f"  Docs Archivo 1 (muestra): {list(set_a)[:5]}")
+    logger.debug(f"  Docs Archivo 2 (muestra): {list(set_b)[:5]}")
 
-    # Emparejar
-    total_fields_compared = 0
-    total_matches = 0
-    field_mismatch_counts = {field_key: 0 for field_key, _ in COMPARE_FIELDS}
+    # Cédulas que están en ambos archivos
+    common = set_a & set_b
+    # Cédulas solo en Archivo 1
+    only_a = set_a - set_b
+    # Cédulas solo en Archivo 2
+    only_b = set_b - set_a
 
-    for doc_num, records_a in index_a.items():
-        records_b = index_b.get(doc_num, [])
-        if records_b:
-            # Emparejar uno a uno, consumiendo de ambas listas
-            pairs = min(len(records_a), len(records_b))
-            for i in range(pairs):
-                record_a = records_a[i]
-                record_b = records_b[i]
+    # Registros emparejados (cédula encontrada en ambos)
+    for doc_num in sorted(common):
+        record_a = docs_a[doc_num]
+        record_b = docs_b[doc_num]
 
-                comparison = RecordComparison(
-                    document_number=record_a.get("numero_documento", doc_num)
-                )
+        comparison = RecordComparison(
+            document_number=record_a.get("numero_documento", doc_num)
+        )
 
-                for field_key, field_label in COMPARE_FIELDS:
-                    val_a = record_a.get(field_key, "")
-                    val_b = record_b.get(field_key, "")
+        # Mostrar campo a campo para los emparejados, pero sin reportar inconsistencias
+        for field_key, field_label in COMPARE_FIELDS:
+            val_a = record_a.get(field_key, "")
+            val_b = record_b.get(field_key, "")
 
-                    norm_a = _normalize_for_comparison(val_a, field_key)
-                    norm_b = _normalize_for_comparison(val_b, field_key)
+            # Dado que el usuario especificó que "desde que el numero coincida lo demas no genera inconsistencia",
+            # forzamos a que siempre se considere una coincidencia válida.
+            matches = True
 
-                    total_fields_compared += 1
+            comparison.fields.append(FieldComparison(
+                field_name=field_label,
+                value_a=val_a,
+                value_b=val_b,
+                matches=matches,
+            ))
 
-                    matches = (norm_a == norm_b) or (not norm_a and not norm_b)
+        result.matched.append(comparison)
 
-                    if matches:
-                        total_matches += 1
-                    else:
-                        comparison.all_match = False
-                        comparison.mismatches += 1
-                        field_mismatch_counts[field_key] += 1
+    # Registros solo en Archivo 1
+    for doc_num in sorted(only_a):
+        result.only_in_a.append(docs_a[doc_num])
 
-                    comparison.fields.append(FieldComparison(
-                        field_name=field_label,
-                        value_a=val_a,
-                        value_b=val_b,
-                        matches=matches,
-                    ))
-
-                result.matched.append(comparison)
-
-            # Sobrantes en A (más registros en A que en B para esta cédula)
-            for i in range(pairs, len(records_a)):
-                result.only_in_a.append(records_a[i])
-            # Sobrantes en B (más registros en B que en A para esta cédula)
-            for i in range(pairs, len(records_b)):
-                result.only_in_b.append(records_b[i])
-        else:
-            # Todos los registros con esta cédula solo están en A
-            result.only_in_a.extend(records_a)
-
-    # Registros solo en B (cédulas que no existen en A)
-    for doc_num, records_b in index_b.items():
-        if doc_num not in index_a:
-            result.only_in_b.extend(records_b)
+    # Registros solo en Archivo 2
+    for doc_num in sorted(only_b):
+        result.only_in_b.append(docs_b[doc_num])
 
     # Estadísticas
-    total_records = len(file_a_data) + len(file_b_data)
-    total_matched = len(result.matched)
-    total_only_a = len(result.only_in_a)
-    total_only_b = len(result.only_in_b)
+    total_matched = len(common)
+    total_only_a = len(only_a)
+    total_only_b = len(only_b)
     total_mismatches = sum(1 for m in result.matched if not m.all_match)
+
+    # Calcular discrepancias por campo
+    field_mismatch_counts = {field_key: 0 for field_key, _ in COMPARE_FIELDS}
+    for m in result.matched:
+        for fc in m.fields:
+            if not fc.matches:
+                # Buscar la clave interna del campo
+                for fk, fl in COMPARE_FIELDS:
+                    if fl == fc.field_name:
+                        field_mismatch_counts[fk] += 1
+                        break
+
+    # all_clear = ambos archivos tienen exactamente las mismas cédulas
+    all_clear = total_only_a == 0 and total_only_b == 0
 
     result.stats = {
         "total_records_a": len(file_a_data),
         "total_records_b": len(file_b_data),
+        "cedulas_archivo_1": len(set_a),
+        "cedulas_archivo_2": len(set_b),
         "matched_pairs": total_matched,
         "only_in_a": total_only_a,
         "only_in_b": total_only_b,
-        "total_fields_compared": total_fields_compared,
-        "matching_fields": total_matches,
-        "mismatching_fields": total_fields_compared - total_matches,
         "records_with_mismatches": total_mismatches,
         "records_all_match": total_matched - total_mismatches,
-        "accuracy_pct": round((total_matches / total_fields_compared * 100), 1) if total_fields_compared > 0 else 0,
         "field_mismatch_counts": field_mismatch_counts,
-        "all_clear": total_mismatches == 0 and total_only_a == 0 and total_only_b == 0,
+        "all_clear": all_clear,
     }
 
     return result
@@ -397,8 +565,8 @@ def create_reconciliation_excel(result: ReconciliationResult) -> io.BytesIO:
 
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         _write_reconciliation_sheet(writer, result)
-        _write_only_in_sheet(writer, result.only_in_a, "Solo en Archivo A", "🔴")
-        _write_only_in_sheet(writer, result.only_in_b, "Solo en Archivo B", "🔵")
+        _write_only_in_sheet(writer, result.only_in_a, "Solo en Archivo 1", "🔴")
+        _write_only_in_sheet(writer, result.only_in_b, "Solo en Archivo 2", "🔵")
         _write_summary_sheet(writer, result)
 
     output.seek(0)
@@ -525,8 +693,9 @@ def _write_summary_sheet(writer, result: ReconciliationResult):
     stats = result.stats
 
     # Título
-    title = "✅ Sin incongruencias — Todos los datos coinciden" if stats["all_clear"] \
-        else f"⚠️ {stats['mismatching_fields']} incongruencias encontradas"
+    total_issues = stats["only_in_a"] + stats["only_in_b"]
+    title = "✅ Todas las cédulas coinciden — Ambos archivos son consistentes" if stats["all_clear"] \
+        else f"⚠️ {total_issues} cédula(s) no coinciden entre los archivos"
     ws.cell(row=1, column=1, value="Resumen de Conciliación")
     ws.cell(row=1, column=1).font = TITLE_FONT
 
@@ -542,17 +711,14 @@ def _write_summary_sheet(writer, result: ReconciliationResult):
     ws.cell(row=4, column=1).font = BOLD_FONT
 
     metrics = [
-        ("Total registros Archivo A", stats["total_records_a"]),
-        ("Total registros Archivo B", stats["total_records_b"]),
-        ("Registros emparejados", stats["matched_pairs"]),
-        ("Registros solo en A", stats["only_in_a"]),
-        ("Registros solo en B", stats["only_in_b"]),
-        ("Campos comparados", stats["total_fields_compared"]),
-        ("Campos coincidentes", stats["matching_fields"]),
-        ("Campos con diferencias", stats["mismatching_fields"]),
-        ("Registros con discrepancias", stats["records_with_mismatches"]),
-        ("Registros sin discrepancias", stats["records_all_match"]),
-        ("Precisión global", f"{stats['accuracy_pct']}%"),
+        ("Total registros Archivo 1", stats["total_records_a"]),
+        ("Total registros Archivo 2", stats["total_records_b"]),
+        ("Cédulas únicas Archivo 1", stats.get("cedulas_archivo_1", "—")),
+        ("Cédulas únicas Archivo 2", stats.get("cedulas_archivo_2", "—")),
+        ("Cédulas emparejadas (en ambos)", stats["matched_pairs"]),
+        ("Cédulas solo en Archivo 1", stats["only_in_a"]),
+        ("Cédulas solo en Archivo 2", stats["only_in_b"]),
+        ("Registros con diferencias de datos", stats["records_with_mismatches"]),
     ]
 
     for i, (label, value) in enumerate(metrics):
@@ -564,28 +730,25 @@ def _write_summary_sheet(writer, result: ReconciliationResult):
         cell_val.border = THIN_BORDER
         cell_val.alignment = CENTER_ALIGN
 
-        # Colorear precisión
-        if label == "Precisión global" and isinstance(value, str):
-            pct = float(value.replace("%", ""))
-            if pct >= 95:
-                cell_val.fill = GREEN_FILL
-            elif pct >= 80:
-                cell_val.fill = YELLOW_FILL
-            else:
-                cell_val.fill = RED_FILL
+        # Colorear cédulas sin par en rojo
+        if "solo en" in label.lower() and isinstance(value, int) and value > 0:
+            cell_val.fill = RED_FILL
+        elif "emparejadas" in label.lower() and isinstance(value, int) and value > 0:
+            cell_val.fill = GREEN_FILL
 
-    # Desglose por campo
-    ws.cell(row=18, column=1, value="Discrepancias por Campo")
-    ws.cell(row=18, column=1).font = BOLD_FONT
+    # Desglose por campo (solo si hay emparejados)
+    start_row = 5 + len(metrics) + 2
+    ws.cell(row=start_row, column=1, value="Discrepancias por Campo (registros emparejados)")
+    ws.cell(row=start_row, column=1).font = BOLD_FONT
 
     headers = ["Campo", "Discrepancias"]
     for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=19, column=col, value=header)
+        cell = ws.cell(row=start_row + 1, column=col, value=header)
         cell.fill = HEADER_FILL
         cell.font = HEADER_FONT
         cell.alignment = CENTER_ALIGN
 
-    row = 20
+    row = start_row + 2
     for field_key, field_label in COMPARE_FIELDS:
         mismatches = stats["field_mismatch_counts"].get(field_key, 0)
         ws.cell(row=row, column=1, value=field_label).font = NORMAL_FONT
@@ -598,5 +761,5 @@ def _write_summary_sheet(writer, result: ReconciliationResult):
         row += 1
 
     # Anchos
-    ws.column_dimensions["A"].width = 35
+    ws.column_dimensions["A"].width = 42
     ws.column_dimensions["B"].width = 14

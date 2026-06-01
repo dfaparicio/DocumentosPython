@@ -17,7 +17,6 @@ from services.compare_service import (
     reconcile,
     create_reconciliation_excel,
 )
-from services.reference_generator import generate_shuffled_excel
 
 logger = logging.getLogger(__name__)
 
@@ -45,39 +44,6 @@ def _cleanup_cache():
         for k in sorted_keys[:len(_report_cache) - _CACHE_MAX_SIZE]:
             del _report_cache[k]
 
-
-@router.post("/shuffle")
-async def shuffle_excel(file: UploadFile = File(...)):
-    """
-    Recibe un Excel y devuelve el mismo con las filas en orden aleatorio.
-
-    Receives an Excel and returns it with rows in random order.
-    """
-    if not file.filename.lower().endswith(('.xlsx', '.xls')):
-        raise HTTPException(
-            status_code=400,
-            detail="El archivo debe ser un Excel (.xlsx o .xls)"
-        )
-
-    try:
-        file_bytes = await file.read()
-
-        output = generate_shuffled_excel(file_bytes)
-
-        return StreamingResponse(
-            output,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={
-                "Content-Disposition": "attachment; filename=documentos_mezclados.xlsx"
-            }
-        )
-
-    except Exception as e:
-        logger.error(f"Error al mezclar Excel: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al procesar el archivo: {str(e)}"
-        )
 
 
 @router.post("/reconcile")
@@ -127,9 +93,8 @@ async def reconcile_files(
         _report_cache[report_id] = {"data": output.read(), "created_at": time.time()}
 
         logger.info(
-            f"Resultado: {result.stats['matched_pairs']} pares, "
-            f"{result.stats['mismatching_fields']} diferencias, "
-            f"{result.stats['accuracy_pct']}% precisión, report_id={report_id}"
+            f"Resultado: {result.stats['matched_pairs']} pares coincidentes, "
+            f"{result.stats['only_in_a']} solo en 1, {result.stats['only_in_b']} solo en 2, report_id={report_id}"
         )
 
         # Construir respuesta JSON con todo el detalle
@@ -172,16 +137,14 @@ async def reconcile_files(
             "report_id": report_id,
             "all_clear": result.stats["all_clear"],
             "stats": {
-                "total_registros_a": result.stats["total_records_a"],
-                "total_registros_b": result.stats["total_records_b"],
+                "total_registros_1": result.stats["total_records_a"],
+                "total_registros_2": result.stats["total_records_b"],
+                "cedulas_archivo_1": result.stats["cedulas_archivo_1"],
+                "cedulas_archivo_2": result.stats["cedulas_archivo_2"],
                 "emparejados": result.stats["matched_pairs"],
-                "solo_en_a": result.stats["only_in_a"],
-                "solo_en_b": result.stats["only_in_b"],
-                "campos_comparados": result.stats["total_fields_compared"],
-                "campos_coincidentes": result.stats["matching_fields"],
-                "campos_diferentes": result.stats["mismatching_fields"],
+                "solo_en_1": result.stats["only_in_a"],
+                "solo_en_2": result.stats["only_in_b"],
                 "registros_con_diferencias": result.stats["records_with_mismatches"],
-                "precision_pct": result.stats["accuracy_pct"],
                 "discrepancias_por_campo": {
                     label: result.stats["field_mismatch_counts"].get(key, 0)
                     for key, label in [
@@ -195,8 +158,8 @@ async def reconcile_files(
                 },
             },
             "discrepancias": discrepancies,
-            "solo_en_a_detalle": only_in_a,
-            "solo_en_b_detalle": only_in_b,
+            "solo_en_1_detalle": only_in_a,
+            "solo_en_2_detalle": only_in_b,
         }
 
     except HTTPException:

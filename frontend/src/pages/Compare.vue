@@ -7,67 +7,18 @@
           <span class="text-gradient">Reconciliar Documentos</span>
         </h1>
         <p class="subtitle">
-          Compara dos archivos Excel buscando inconsistencias en los datos, sin importar el orden de las filas.
+          Compara dos archivos Excel verificando que contengan las mismas cédulas, sin importar el orden de las filas.
         </p>
       </header>
 
-      <!-- Sección 1: Mezclar -->
-      <div class="card q-mb-lg">
-        <div class="card-header">
-          <h2 class="card-title">
-            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
-            Mezclar Excel
-          </h2>
-          <p class="card-desc">Sube un Excel y descárgalo con las filas en orden aleatorio.</p>
-        </div>
 
-        <div class="row-items">
-          <div class="flex-grow">
-            <div
-              class="drop-zone"
-              :class="{ dragging: isDraggingShuffle }"
-              @dragover.prevent="isDraggingShuffle = true"
-              @dragleave.prevent="isDraggingShuffle = false"
-              @drop.prevent="onDropShuffle"
-              @click="shuffleInput?.click()"
-            >
-              <svg class="upload-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16V4m0 0L8 8m4-4l4 4"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 16v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2"/>
-              </svg>
-              <span v-if="!shuffleFile">Arrastra un Excel aquí o haz clic</span>
-              <span v-else class="file-selected">📄 {{ shuffleFile.name }}</span>
-              <input ref="shuffleInput" type="file" accept=".xlsx,.xls" class="hidden-input" @change="onSelectShuffle" />
-            </div>
-          </div>
-          <div>
-            <button
-              class="btn btn-primary"
-              :disabled="!shuffleFile || loading"
-              @click="handleShuffle"
-            >
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-              Mezclar y Descargar
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Divisor visual -->
-      <div class="divider">
-        <span class="divider-text">Comparar dos archivos</span>
-      </div>
 
       <!-- Sección 2: Comparar -->
       <div class="compare-grid">
         <!-- Archivo A -->
         <div class="card">
           <div class="card-header">
-            <h3 class="card-title">📄 Archivo A</h3>
+            <h3 class="card-title">📄 Archivo 1</h3>
           </div>
           <div
             class="drop-zone"
@@ -89,7 +40,7 @@
         <!-- Archivo B -->
         <div class="card">
           <div class="card-header">
-            <h3 class="card-title">📄 Archivo B</h3>
+            <h3 class="card-title">📄 Archivo 2</h3>
           </div>
           <div
             class="drop-zone"
@@ -143,20 +94,20 @@
         <!-- Estadísticas rápidas -->
         <div v-if="store.stats" class="stats-grid q-mt-md">
           <div class="stat-card">
-            <span class="stat-number">{{ store.stats.emparejados }}</span>
-            <span class="stat-label">Emparejados</span>
-          </div>
-          <div class="stat-card" :class="{ 'stat-error': store.stats.campos_diferentes > 0 }">
-            <span class="stat-number">{{ store.stats.campos_diferentes }}</span>
-            <span class="stat-label">Diferencias</span>
+            <span class="stat-number">{{ store.stats.cedulas_archivo_1 }}</span>
+            <span class="stat-label">Cédulas Archivo 1</span>
           </div>
           <div class="stat-card">
-            <span class="stat-number">{{ store.stats.precision_pct }}%</span>
-            <span class="stat-label">Precisión</span>
+            <span class="stat-number">{{ store.stats.cedulas_archivo_2 }}</span>
+            <span class="stat-label">Cédulas Archivo 2</span>
           </div>
-          <div class="stat-card" :class="{ 'stat-warn': store.stats.solo_en_a > 0 }">
-            <span class="stat-number">{{ store.stats.solo_en_a + store.stats.solo_en_b }}</span>
-            <span class="stat-label">Sin par</span>
+          <div class="stat-card" :class="{ 'stat-ok': store.stats.emparejados > 0 }">
+            <span class="stat-number">{{ store.stats.emparejados }}</span>
+            <span class="stat-label">Coinciden</span>
+          </div>
+          <div class="stat-card" :class="{ 'stat-error': (store.stats.solo_en_1 + store.stats.solo_en_2) > 0 }">
+            <span class="stat-number">{{ store.stats.solo_en_1 + store.stats.solo_en_2 }}</span>
+            <span class="stat-label">No coinciden</span>
           </div>
         </div>
 
@@ -208,7 +159,8 @@
 
         <!-- Registros sin par -->
         <div v-if="store.onlyInA.length > 0" class="card q-mt-md">
-          <h3 class="card-title q-mb-md">Solo en Archivo A ({{ store.onlyInA.length }})</h3>
+          <h3 class="card-title q-mb-md">⚠️ Solo en Archivo 1 ({{ store.onlyInA.length }})</h3>
+          <p class="card-desc q-mb-sm">Estas cédulas están en el Archivo 1 pero NO en el Archivo 2</p>
           <div class="no-match-list">
             <div v-for="(r, idx) in store.onlyInA" :key="idx" class="no-match-item">
               <span class="no-match-cedula">{{ r.cedula }}</span>
@@ -218,7 +170,8 @@
         </div>
 
         <div v-if="store.onlyInB.length > 0" class="card q-mt-md">
-          <h3 class="card-title q-mb-md">Solo en Archivo B ({{ store.onlyInB.length }})</h3>
+          <h3 class="card-title q-mb-md">⚠️ Solo en Archivo 2 ({{ store.onlyInB.length }})</h3>
+          <p class="card-desc q-mb-sm">Estas cédulas están en el Archivo 2 pero NO en el Archivo 1</p>
           <div class="no-match-list">
             <div v-for="(r, idx) in store.onlyInB" :key="idx" class="no-match-item">
               <span class="no-match-cedula">{{ r.cedula }}</span>
@@ -240,10 +193,7 @@
         </div>
       </div>
 
-      <!-- Mensaje de éxito genérico (shuffle) -->
-      <div v-if="store.success && !store.hasResult" class="alert alert-success q-mt-md">
-        {{ store.success }}
-      </div>
+
 
       <!-- Mensaje de error -->
       <div v-if="store.error" class="alert alert-error q-mt-md">
@@ -268,42 +218,20 @@ import { useComparisonStore } from '../stores/comparison'
 import { useComparison } from '../composables/useComparison'
 
 const store = useComparisonStore()
-const { shuffleExcel, reconcileFiles, downloadReport } = useComparison()
+const { reconcileFiles, downloadReport } = useComparison()
 
 // Refs para inputs
-const shuffleInput = ref(null)
 const inputA = ref(null)
 const inputB = ref(null)
 
 // Estado de drag local
-const isDraggingShuffle = ref(false)
 const isDraggingA = ref(false)
 const isDraggingB = ref(false)
-
-// Archivo para mezclar (separado del store)
-const shuffleFile = ref(null)
 
 // Computed
 const loading = computed(() => store.loading)
 
-// === Mezclar ===
-function onDropShuffle(e) {
-  isDraggingShuffle.value = false
-  const file = e.dataTransfer.files[0]
-  if (file) shuffleFile.value = file
-}
 
-function onSelectShuffle(e) {
-  const file = e.target.files[0]
-  if (file) shuffleFile.value = file
-  e.target.value = ''
-}
-
-async function handleShuffle() {
-  if (!shuffleFile.value) return
-  await shuffleExcel(shuffleFile.value)
-  shuffleFile.value = null
-}
 
 // === Archivo A ===
 function onDropA(e) {
@@ -633,6 +561,10 @@ async function handleCompare() {
 
 .stat-error .stat-number {
   color: #dc2626;
+}
+
+.stat-ok .stat-number {
+  color: #059669;
 }
 
 .stat-warn .stat-number {
