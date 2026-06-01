@@ -22,6 +22,14 @@ const routes = [
         meta: {
           title: 'Extractor de Cédulas'
         }
+      },
+      {
+        path: 'comparar',
+        // Página de comparación y reconciliación de archivos Excel
+        component: () => import('../pages/Compare.vue'),
+        meta: {
+          title: 'Comparar Documentos'
+        }
       }
     ]
   },

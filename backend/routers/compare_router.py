@@ -7,6 +7,7 @@ Allows shuffling an Excel and comparing two files for inconsistencies.
 """
 
 import uuid
+import time
 import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
@@ -22,9 +23,27 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/compare", tags=["comparación"])
 
-# Cache temporal de reportes generados (clave -> bytes del Excel)
-# Temporary cache of generated reports (key -> Excel bytes)
+# Cache temporal de reportes generados con TTL
+# Temporary cache of generated reports with TTL
+_CACHE_MAX_SIZE = 50
+_CACHE_TTL_SECONDS = 30 * 60  # 30 minutos
+
+# Cada entrada: { "data": bytes, "created_at": timestamp }
 _report_cache: dict = {}
+
+
+def _cleanup_cache():
+    """Elimina entradas expiradas y limita el tamaño del cache."""
+    now = time.time()
+    # Eliminar expiradas
+    expired = [k for k, v in _report_cache.items() if now - v["created_at"] > _CACHE_TTL_SECONDS]
+    for k in expired:
+        del _report_cache[k]
+    # Si aún excede el límite, eliminar las más antiguas
+    if len(_report_cache) > _CACHE_MAX_SIZE:
+        sorted_keys = sorted(_report_cache, key=lambda k: _report_cache[k]["created_at"])
+        for k in sorted_keys[:len(_report_cache) - _CACHE_MAX_SIZE]:
+            del _report_cache[k]
 
 
 @router.post("/shuffle")
@@ -104,7 +123,8 @@ async def reconcile_files(
         output = create_reconciliation_excel(result)
         report_id = str(uuid.uuid4())[:8]
         output.seek(0)
-        _report_cache[report_id] = output.read()
+        _cleanup_cache()
+        _report_cache[report_id] = {"data": output.read(), "created_at": time.time()}
 
         logger.info(
             f"Resultado: {result.stats['matched_pairs']} pares, "
@@ -199,11 +219,12 @@ async def download_report(report_id: str):
 
     Downloads the previously generated reconciliation Excel.
     """
+    _cleanup_cache()
     if report_id not in _report_cache:
-        raise HTTPException(status_code=404, detail="Reporte no encontrado. Realiza una nueva comparación.")
+        raise HTTPException(status_code=404, detail="Reporte no encontrado o expirado. Realiza una nueva comparación.")
 
     from io import BytesIO
-    excel_bytes = _report_cache[report_id]
+    excel_bytes = _report_cache[report_id]["data"]
 
     return StreamingResponse(
         BytesIO(excel_bytes),
