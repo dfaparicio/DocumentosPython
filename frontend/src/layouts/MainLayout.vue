@@ -25,26 +25,6 @@
         <!-- Espaciador para separar elementos -->
         <q-space />
 
-        <!-- Links de navegación -->
-        <q-btn
-          flat
-          no-caps
-          :to="'/'"
-          :class="{ 'nav-active': $route.path === '/' }"
-          icon="image_scanner"
-          label="Extraer"
-          class="q-mr-xs"
-        />
-        <q-btn
-          flat
-          no-caps
-          to="/comparar"
-          :class="{ 'nav-active': $route.path === '/comparar' }"
-          icon="compare_arrows"
-          label="Comparar"
-          class="q-mr-md"
-        />
-
         <!-- Icono de información con tooltip -->
         <q-btn
           flat
@@ -267,10 +247,5 @@ function showHelp() {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
-}
-
-.nav-active {
-  background: rgba(255, 255, 255, 0.15);
-  font-weight: 600;
 }
 </style>
