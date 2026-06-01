@@ -54,3 +54,8 @@ from routers.extract_router import router as extract_router
 # Include the router in the application
 # This makes the /extract/ endpoint available
 app.include_router(extract_router)
+
+# Router de comparación y reconciliación
+# Comparison and reconciliation router
+from routers.compare_router import router as compare_router
+app.include_router(compare_router)
