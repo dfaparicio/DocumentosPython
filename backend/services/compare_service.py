@@ -11,6 +11,7 @@ import re
 import logging
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass, field
+from collections import defaultdict
 
 import pandas as pd
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -90,6 +91,42 @@ class ReconciliationResult:
     stats: Dict = field(default_factory=dict)
 
 
+def _clean_value(val) -> str:
+    """
+    Limpia un valor de celda de Excel: elimina NaN, floats .0, etc.
+    Cleans an Excel cell value: removes NaN, float .0, etc.
+    """
+    if pd.isna(val):
+        return ""
+    val_str = str(val).strip()
+    # Eliminar sufijo .0 de números almacenados como float en Excel
+    if val_str.endswith(".0") and val_str != ".0":
+        try:
+            # Verificar que es realmente un float antes de quitar .0
+            float(val_str)
+            val_str = val_str[:-2]
+        except ValueError:
+            pass
+    # Eliminar valores "nan" que pandas genera a veces
+    if val_str.lower() == "nan":
+        return ""
+    return val_str
+
+
+def _normalize_col_name(col: str) -> str:
+    """
+    Normaliza un nombre de columna: minúsculas, sin acentos, sin espacios extra.
+    Normalizes a column name: lowercase, no accents, no extra spaces.
+    """
+    col = col.strip().lower()
+    # Quitar acentos para matching tolerante
+    replacements = {'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u', 'ü': 'u', 'ñ': 'n'}
+    for accented, plain in replacements.items():
+        col = col.replace(accented, plain)
+    # Colapsar espacios múltiples
+    return re.sub(r'\s+', ' ', col)
+
+
 def parse_excel_for_comparison(file_bytes: bytes) -> List[Dict]:
     """
     Lee un Excel y extrae los datos normalizados para comparación.
@@ -102,17 +139,22 @@ def parse_excel_for_comparison(file_bytes: bytes) -> List[Dict]:
         # Si no tiene hoja "Documentos", intentar la primera hoja
         df = pd.read_excel(io.BytesIO(file_bytes), sheet_name=0)
 
-    # Normalizar nombres de columnas
-    df.columns = [col.strip().lower() for col in df.columns]
+    # Normalizar nombres de columnas (sin acentos, sin espacios extra)
+    df.columns = [_normalize_col_name(col) for col in df.columns]
+
+    logger.info(f"Columnas detectadas en Excel: {list(df.columns)}")
+    logger.info(f"Total filas: {len(df)}")
+
+    # También normalizar las claves de COLUMN_MAP para el matching
+    normalized_map = {_normalize_col_name(k): v for k, v in COLUMN_MAP.items()}
 
     # Mapear columnas
     records = []
     for _, row in df.iterrows():
         record = {}
-        for col_name, key in COLUMN_MAP.items():
+        for col_name, key in normalized_map.items():
             if col_name in df.columns:
-                val = row.get(col_name, "")
-                record[key] = str(val).strip() if pd.notna(val) else ""
+                record[key] = _clean_value(row.get(col_name, ""))
             else:
                 record[key] = ""
 
@@ -120,6 +162,17 @@ def parse_excel_for_comparison(file_bytes: bytes) -> List[Dict]:
         record["_doc_normalized"] = _normalize_doc_number(record.get("numero_documento", ""))
 
         records.append(record)
+
+    # Log de diagnóstico: mostrar cuántos registros tienen número de documento
+    with_doc = sum(1 for r in records if r.get("_doc_normalized"))
+    logger.info(f"Registros parseados: {len(records)}, con numero_documento: {with_doc}")
+
+    # Log de los primeros 3 documentos normalizados para diagnóstico
+    for i, r in enumerate(records[:3]):
+        logger.debug(
+            f"  Registro {i+1}: doc='{r.get('numero_documento', '')}' "
+            f"-> normalized='{r.get('_doc_normalized', '')}'"
+        )
 
     return records
 
@@ -221,67 +274,92 @@ def reconcile(file_a_data: List[Dict], file_b_data: List[Dict]) -> Reconciliatio
     """
     result = ReconciliationResult()
 
-    # Indexar por número de documento normalizado
-    index_a = {}
+    # Indexar por número de documento normalizado (listas para soportar duplicados)
+    index_a = defaultdict(list)
     for record in file_a_data:
         doc = record.get("_doc_normalized", "")
         if doc:
-            index_a[doc] = record
+            index_a[doc].append(record)
+        else:
+            # Registros sin número de documento van directo a only_in_a
+            result.only_in_a.append(record)
 
-    index_b = {}
+    index_b = defaultdict(list)
     for record in file_b_data:
         doc = record.get("_doc_normalized", "")
         if doc:
-            index_b[doc] = record
+            index_b[doc].append(record)
+        else:
+            # Registros sin número de documento van directo a only_in_b
+            result.only_in_b.append(record)
+
+    logger.info(
+        f"Índices: A tiene {len(index_a)} cédulas únicas, "
+        f"B tiene {len(index_b)} cédulas únicas"
+    )
+    # Log primeros 5 docs de cada índice para diagnóstico
+    logger.debug(f"  Docs A (muestra): {list(index_a.keys())[:5]}")
+    logger.debug(f"  Docs B (muestra): {list(index_b.keys())[:5]}")
 
     # Emparejar
-    matched_docs = set()
     total_fields_compared = 0
     total_matches = 0
     field_mismatch_counts = {field_key: 0 for field_key, _ in COMPARE_FIELDS}
 
-    for doc_num, record_a in index_a.items():
-        if doc_num in index_b:
-            record_b = index_b[doc_num]
-            matched_docs.add(doc_num)
+    for doc_num, records_a in index_a.items():
+        records_b = index_b.get(doc_num, [])
+        if records_b:
+            # Emparejar uno a uno, consumiendo de ambas listas
+            pairs = min(len(records_a), len(records_b))
+            for i in range(pairs):
+                record_a = records_a[i]
+                record_b = records_b[i]
 
-            comparison = RecordComparison(
-                document_number=record_a.get("numero_documento", doc_num)
-            )
+                comparison = RecordComparison(
+                    document_number=record_a.get("numero_documento", doc_num)
+                )
 
-            for field_key, field_label in COMPARE_FIELDS:
-                val_a = record_a.get(field_key, "")
-                val_b = record_b.get(field_key, "")
+                for field_key, field_label in COMPARE_FIELDS:
+                    val_a = record_a.get(field_key, "")
+                    val_b = record_b.get(field_key, "")
 
-                norm_a = _normalize_for_comparison(val_a, field_key)
-                norm_b = _normalize_for_comparison(val_b, field_key)
+                    norm_a = _normalize_for_comparison(val_a, field_key)
+                    norm_b = _normalize_for_comparison(val_b, field_key)
 
-                total_fields_compared += 1
+                    total_fields_compared += 1
 
-                matches = (norm_a == norm_b) or (not norm_a and not norm_b)
+                    matches = (norm_a == norm_b) or (not norm_a and not norm_b)
 
-                if matches:
-                    total_matches += 1
-                else:
-                    comparison.all_match = False
-                    comparison.mismatches += 1
-                    field_mismatch_counts[field_key] += 1
+                    if matches:
+                        total_matches += 1
+                    else:
+                        comparison.all_match = False
+                        comparison.mismatches += 1
+                        field_mismatch_counts[field_key] += 1
 
-                comparison.fields.append(FieldComparison(
-                    field_name=field_label,
-                    value_a=val_a,
-                    value_b=val_b,
-                    matches=matches,
-                ))
+                    comparison.fields.append(FieldComparison(
+                        field_name=field_label,
+                        value_a=val_a,
+                        value_b=val_b,
+                        matches=matches,
+                    ))
 
-            result.matched.append(comparison)
+                result.matched.append(comparison)
+
+            # Sobrantes en A (más registros en A que en B para esta cédula)
+            for i in range(pairs, len(records_a)):
+                result.only_in_a.append(records_a[i])
+            # Sobrantes en B (más registros en B que en A para esta cédula)
+            for i in range(pairs, len(records_b)):
+                result.only_in_b.append(records_b[i])
         else:
-            result.only_in_a.append(record_a)
+            # Todos los registros con esta cédula solo están en A
+            result.only_in_a.extend(records_a)
 
-    # Registros solo en B
-    for doc_num, record_b in index_b.items():
-        if doc_num not in matched_docs:
-            result.only_in_b.append(record_b)
+    # Registros solo en B (cédulas que no existen en A)
+    for doc_num, records_b in index_b.items():
+        if doc_num not in index_a:
+            result.only_in_b.extend(records_b)
 
     # Estadísticas
     total_records = len(file_a_data) + len(file_b_data)

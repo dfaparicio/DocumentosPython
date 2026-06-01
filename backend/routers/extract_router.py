@@ -135,8 +135,8 @@ async def extract_from_pdf(pdf_file: UploadFile = File(...)):
 
         page_results = await process_pages_batch(
             images=images_list,
-            max_concurrent=5,  # 5 llamadas concurrentes a Gemini
-            # 5 concurrent calls to Gemini
+            max_concurrent=3,  # 3 llamadas concurrentes a Gemini (reducido para evitar 503)
+            # 3 concurrent calls to Gemini (reduced to avoid 503)
             progress=_current_progress
         )
 

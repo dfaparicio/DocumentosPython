@@ -93,8 +93,8 @@ def extract_data_from_image(image_bytes: bytes,
         prompt = get_prompt(document_type, face_type)
 
         @retry(
-            stop=stop_after_attempt(4),
-            wait=wait_exponential(multiplier=1, min=2, max=10),
+            stop=stop_after_attempt(5),
+            wait=wait_exponential(multiplier=2, min=2, max=60),
             reraise=True
         )
         def _call_api():

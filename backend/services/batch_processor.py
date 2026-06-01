@@ -31,7 +31,23 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# Lista de modelos para rotación round-robin y fallback ante errores 503.
+# Se configura con GEMINI_MODELS (separados por coma) o GEMINI_MODEL (uno solo + lite como fallback).
+# Model list for round-robin rotation and 503 error fallback.
+# Configure with GEMINI_MODELS (comma-separated) or GEMINI_MODEL (single + lite as fallback).
+_models_env = os.getenv("GEMINI_MODELS", "").strip()
+if _models_env:
+    GEMINI_MODELS = [m.strip() for m in _models_env.split(",") if m.strip()]
+else:
+    _primary = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    # Auto-agregar flash-lite como fallback si no está ya incluido
+    # Auto-add flash-lite as fallback if not already included
+    if "lite" not in _primary:
+        GEMINI_MODELS = [_primary, _primary + "-lite"]
+    else:
+        GEMINI_MODELS = [_primary]
+
+logger.info(f"Modelos configurados para rotación: {GEMINI_MODELS}")
 
 # Unified prompt that classifies + extracts in a SINGLE call (Spanish prompt for Colombian ID documents)
 # Prompt unificado que clasifica + extrae en UNA SOLA llamada
@@ -114,8 +130,10 @@ REQUIRED_DATA_FIELDS = ["numero_documento", "nombres", "apellidos"]
 
 # Configuracion de reintentos
 # Retry configuration
-MAX_RETRIES = 2
+MAX_RETRIES = 6
 RETRY_BASE_DELAY = 2.0
+RETRY_503_BASE_DELAY = 6.0  # Delay más largo para errores de cuota/503
+# Longer delay for quota/503 errors
 
 
 @dataclass
@@ -190,14 +208,15 @@ async def process_single_page(
     image_bytes: bytes,
     page_number: int,
     semaphore: asyncio.Semaphore,
-    progress: Optional[ProcessingProgress] = None
+    progress: Optional[ProcessingProgress] = None,
+    assigned_model: Optional[str] = None
 ) -> PageResult:
     """
     Procesa UNA pagina con el prompt unificado (clasificar + extraer en 1 llamada).
-    Incluye retry con backoff exponencial y re-procesamiento selectivo.
+    Incluye retry con backoff exponencial, rotación de modelos y re-procesamiento selectivo.
 
     Processes ONE page with the unified prompt (classify + extract in 1 call).
-    Includes retry with exponential backoff and selective re-processing.
+    Includes retry with exponential backoff, model rotation, and selective re-processing.
     """
     # Verificar cache
     # Check cache
@@ -216,25 +235,40 @@ async def process_single_page(
         logger.info(f"Procesando pagina {page_number + 1}...")
 
         last_error = None
+        is_rate_limited = False  # Indica si el último error fue 503/429
 
         for attempt in range(MAX_RETRIES + 1):
             try:
                 if attempt > 0:
-                    delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                    # Usar delay más largo si fue error de cuota (503/429)
+                    # Use longer delay if it was a quota error (503/429)
+                    base = RETRY_503_BASE_DELAY if is_rate_limited else RETRY_BASE_DELAY
+                    delay = min(base * (2 ** (attempt - 1)), 60)  # máximo 60s
                     logger.warning(
                         f"Reintento {attempt}/{MAX_RETRIES} para pagina {page_number + 1} "
-                        f"(espera {delay}s)"
+                        f"(espera {delay:.0f}s, rate_limited={is_rate_limited})"
                     )
                     await asyncio.sleep(delay)
 
+                # Seleccionar modelo: rotar entre modelos disponibles en cada intento
+                # Select model: rotate between available models on each attempt
+                if is_rate_limited and len(GEMINI_MODELS) > 1:
+                    # Si fue 503, cambiar al siguiente modelo
+                    # If it was 503, switch to next model
+                    current_model = GEMINI_MODELS[(GEMINI_MODELS.index(assigned_model or GEMINI_MODELS[0]) + attempt) % len(GEMINI_MODELS)]
+                else:
+                    current_model = assigned_model or GEMINI_MODELS[0]
+
                 def _call_gemini():
                     return client.models.generate_content(
-                        model=GEMINI_MODEL,
+                        model=current_model,
                         contents=[
                             types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
                             UNIFIED_PROMPT
                         ]
                     )
+
+                logger.debug(f"Pagina {page_number + 1}: usando modelo {current_model} (intento {attempt + 1})")
 
                 response = await asyncio.to_thread(_call_gemini)
 
@@ -318,8 +352,13 @@ async def process_single_page(
 
             except Exception as e:
                 last_error = str(e)
+                error_str = str(e).lower()
+                # Detectar errores de cuota/sobrecarga para ajustar backoff
+                # Detect quota/overload errors to adjust backoff
+                is_rate_limited = any(code in error_str for code in ["503", "429", "unavailable", "resource_exhausted", "overloaded"])
                 logger.warning(
-                    f"Error en pagina {page_number + 1} (intento {attempt + 1}/{MAX_RETRIES + 1}): {e}"
+                    f"Error en pagina {page_number + 1} (intento {attempt + 1}/{MAX_RETRIES + 1})"
+                    f"{' [RATE LIMITED]' if is_rate_limited else ''}: {e}"
                 )
                 if attempt == MAX_RETRIES:
                     logger.error(f"❌ Pagina {page_number + 1} fallo despues de {MAX_RETRIES + 1} intentos")
@@ -340,7 +379,8 @@ async def _retry_missing_fields(
     client: genai.Client,
     image_bytes: bytes,
     page_number: int,
-    result: PageResult
+    result: PageResult,
+    model: Optional[str] = None
 ) -> PageResult:
     """
     Re-procesa una pagina para intentar obtener campos faltantes criticos.
@@ -367,9 +407,13 @@ async def _retry_missing_fields(
 
         retry_prompt = get_retry_prompt(result.data, critical_missing)
 
+        # Usar modelo alternativo para el re-intento (distribuir carga)
+        # Use alternative model for retry (distribute load)
+        retry_model = model or GEMINI_MODELS[-1]  # usar el último modelo (lite) para retries
+
         def _call_gemini_retry():
             return client.models.generate_content(
-                model=GEMINI_MODEL,
+                model=retry_model,
                 contents=[
                     types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
                     retry_prompt
@@ -411,25 +455,27 @@ async def _retry_missing_fields(
 
 async def process_pages_batch(
     images: List[bytes],
-    max_concurrent: int = 5,
+    max_concurrent: int = 3,
     progress: Optional[ProcessingProgress] = None
 ) -> List[PageResult]:
     """
     Procesa todas las páginas en paralelo con control de concurrencia.
+    Usa delay escalonado para no saturar la API.
 
     Args:
         images: Lista de imágenes de páginas
-        max_concurrent: Máximo de llamadas concurrentes a Gemini
+        max_concurrent: Máximo de llamadas concurrentes a Gemini (default 3)
         progress: Objeto de progreso para tracking
 
     Returns:
         Lista de PageResult con los datos de cada página
 
     Processes all pages in parallel with concurrency control.
+    Uses staggered delay to avoid saturating the API.
 
     Args:
         images: List of page images
-        max_concurrent: Maximum concurrent calls to Gemini
+        max_concurrent: Maximum concurrent calls to Gemini (default 3)
         progress: Progress object for tracking
 
     Returns:
@@ -446,10 +492,18 @@ async def process_pages_batch(
         progress.total_pages = len(images)
         progress.status = "processing"
 
-    # Procesamos todas las páginas concurrentemente (limitadas por semáforo)
-    # Process all pages concurrently (limited by semaphore)
+    # Creamos tareas con delay escalonado y modelos intercalados (round-robin)
+    # Create tasks with staggered delay and interleaved models (round-robin)
+    async def _delayed_process(img, idx, model_name):
+        """Agrega un delay escalonado antes de procesar con modelo asignado."""
+        if idx > 0:
+            await asyncio.sleep(idx * 1.0)  # 1s entre cada lanzamiento
+        return await process_single_page(client, img, idx, semaphore, progress, assigned_model=model_name)
+
+    logger.info(f"Distribuyendo {len(images)} páginas entre {len(GEMINI_MODELS)} modelo(s): {GEMINI_MODELS}")
+
     tasks = [
-        process_single_page(client, img, i, semaphore, progress)
+        _delayed_process(img, i, GEMINI_MODELS[i % len(GEMINI_MODELS)])
         for i, img in enumerate(images)
     ]
 
