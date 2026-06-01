@@ -4,7 +4,7 @@
       <!-- Header -->
       <header class="header">
         <h1 class="title">
-          <span class="text-gradient">Extrae datos de cédulas con IA</span>
+          <span class="text-gradient">Extrae datos de cédulas  en segundos</span>
         </h1>
         <p class="subtitle">
           Sube un PDF con las fotocopias de las cédulas y obtén un Excel con los datos automáticamente.

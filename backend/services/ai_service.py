@@ -14,6 +14,7 @@ from typing import Dict, Optional, Tuple
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from services.document_prompts import get_prompt, get_all_document_types
 
@@ -27,19 +28,26 @@ logger = logging.getLogger(__name__)
 # We configure the Gemini connection using the new SDK
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
+_genai_client_instance = None
 
 def get_client():
     """
-    Retorna una instancia del cliente Gemini.
+    Retorna una instancia del cliente Gemini (Singleton).
     Lee la API key desde el store (archivo JSON o .env).
 
-    Returns a Gemini client instance.
+    Returns a Gemini client instance (Singleton).
     Reads the API key from the store (JSON file or .env).
     """
+    global _genai_client_instance
+    if _genai_client_instance is not None:
+        return _genai_client_instance
+
     api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key:
         raise ValueError("API key de Gemini no configurada. Agrega GEMINI_API_KEY al archivo .env")
-    return genai.Client(api_key=api_key)
+        
+    _genai_client_instance = genai.Client(api_key=api_key)
+    return _genai_client_instance
 
 
 def extract_data_from_image(image_bytes: bytes,
@@ -84,15 +92,27 @@ def extract_data_from_image(image_bytes: bytes,
         # We get the specific prompt for this document type and face
         prompt = get_prompt(document_type, face_type)
 
-        # Enviamos la imagen y el prompt a la IA usando el nuevo SDK
-        # We send the image and prompt to the AI using the new SDK
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
-                prompt
-            ]
+        @retry(
+            stop=stop_after_attempt(4),
+            wait=wait_exponential(multiplier=1, min=2, max=10),
+            reraise=True
         )
+        def _call_api():
+            return client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                    prompt
+                ],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.1
+                )
+            )
+
+        # Enviamos la imagen y el prompt a la IA usando el nuevo SDK (con reintentos)
+        # We send the image and prompt to the AI using the new SDK (with retries)
+        response = _call_api()
 
         # Obtenemos el texto de la respuesta
         # We get the response text

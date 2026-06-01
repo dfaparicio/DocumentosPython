@@ -5,35 +5,47 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export function useExtraction() {
   const store = useExtractionStore()
-  let progressInterval = null
+  let progressSocket = null
 
   /**
-   * Inicia el polling de progreso cada 800ms
+   * Conecta al WebSocket para recibir el progreso en tiempo real
    */
-  const startProgressPolling = () => {
-    stopProgressPolling()
-    progressInterval = setInterval(async () => {
+  const startProgressTracking = () => {
+    stopProgressTracking()
+    
+    // Construir la URL del WebSocket (http -> ws, https -> wss)
+    const wsUrl = API_URL.replace(/^http/, 'ws') + '/extract/ws/progress'
+    
+    progressSocket = new WebSocket(wsUrl)
+    
+    progressSocket.onmessage = (event) => {
       try {
-        const response = await axios.get(`${API_URL}/extract/progress`)
-        store.setProgress(response.data)
+        const data = JSON.parse(event.data)
+        store.setProgress(data)
 
         // Auto-detener cuando termine
-        if (response.data.status === 'done' || response.data.status === 'error') {
-          stopProgressPolling()
+        if (data.status === 'done' || data.status === 'error') {
+          stopProgressTracking()
         }
       } catch (error) {
-        // Silenciar errores de polling
+        // Silenciar errores de parseo
       }
-    }, 1000)
+    }
+    
+    progressSocket.onerror = (error) => {
+      console.error('Error en WebSocket de progreso:', error)
+    }
   }
 
   /**
-   * Detiene el polling de progreso
+   * Detiene el progreso y cierra el WebSocket
    */
-  const stopProgressPolling = () => {
-    if (progressInterval) {
-      clearInterval(progressInterval)
-      progressInterval = null
+  const stopProgressTracking = () => {
+    if (progressSocket) {
+      if (progressSocket.readyState === WebSocket.OPEN || progressSocket.readyState === WebSocket.CONNECTING) {
+        progressSocket.close()
+      }
+      progressSocket = null
     }
   }
 
@@ -47,8 +59,8 @@ export function useExtraction() {
       store.clearMessages()
       store.resetProgress()
 
-      // Iniciamos el polling de progreso
-      startProgressPolling()
+      // Iniciamos el seguimiento por WebSocket
+      startProgressTracking()
 
       const formData = new FormData()
       formData.append('pdf_file', file)
@@ -61,8 +73,8 @@ export function useExtraction() {
         timeout: 0 // Sin timeout — el proceso puede tardar varios minutos
       })
 
-      // Detener polling
-      stopProgressPolling()
+      // Detener seguimiento WebSocket
+      stopProgressTracking()
 
       // Obtener el progreso final
       try {
@@ -90,7 +102,7 @@ export function useExtraction() {
       store.setSuccess(successMsg)
 
     } catch (error) {
-      stopProgressPolling()
+      stopProgressTracking()
       console.error('Error al procesar PDF:', error)
 
       let errorMessage = 'Ocurrió un error al procesar el archivo.'
@@ -115,7 +127,7 @@ export function useExtraction() {
       store.setError(errorMessage)
     } finally {
       store.setLoading(false)
-      stopProgressPolling()
+      stopProgressTracking()
     }
   }
 

@@ -8,6 +8,7 @@ dist/
 .vuepress/dist
 
 # Archivos de configuración local
+.env
 .env.local
 .env.*.local
 

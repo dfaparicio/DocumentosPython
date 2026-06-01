@@ -24,13 +24,20 @@ app = FastAPI(
     version="1.0.0"
 )
 
+import os
+
+ALLOWED_ORIGINS = os.getenv(
+    "CORS_ALLOWED_ORIGINS", 
+    "http://localhost:5173,http://localhost:9000,http://localhost:8080,http://127.0.0.1:5173,http://127.0.0.1:9000"
+).split(",")
+
 # Configuramos CORS para permitir peticiones desde otros dominios
 # Esto es útil si vas a conectar un frontend desde otra URL
 # Configure CORS to allow requests from other domains
 # Useful when connecting a frontend from a different URL
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En producción, especifica los dominios permitidos / In production, specify allowed domains
+    allow_origins=ALLOWED_ORIGINS,  # Orígenes restringidos por seguridad / Restricted origins for security
     allow_credentials=True,
     allow_methods=["*"],  # Permite todos los métodos (GET, POST, etc.) / Allow all methods
     allow_headers=["*"],  # Permite todos los headers / Allow all headers
