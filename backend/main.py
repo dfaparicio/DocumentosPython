@@ -8,7 +8,6 @@ Main application entry point.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 # Configurar logging al inicio de la aplicación
 # Configure logging at application startup
@@ -48,7 +47,3 @@ from routers.extract_router import router as extract_router
 # Include the router in the application
 # This makes the /extract/ endpoint available
 app.include_router(extract_router)
-
-# Servir frontend estático — va al FINAL para que no capture las rutas de la API
-# Serve frontend static files — goes at the END to avoid capturing API routes
-app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")
