@@ -13,29 +13,8 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass, field
 
 import pandas as pd
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
 
 logger = logging.getLogger(__name__)
-
-# === Estilos ===
-HEADER_FILL = PatternFill(start_color="2E4057", end_color="2E4057", fill_type="solid")
-HEADER_FONT = Font(name="Calibri", bold=True, color="FFFFFF", size=11)
-NORMAL_FONT = Font(name="Calibri", size=11)
-BOLD_FONT = Font(name="Calibri", bold=True, size=11)
-TITLE_FONT = Font(name="Calibri", bold=True, size=14, color="2E4057")
-CENTER_ALIGN = Alignment(horizontal="center", vertical="center")
-LEFT_ALIGN = Alignment(horizontal="left", vertical="center", wrap_text=True)
-THIN_BORDER = Border(
-    left=Side(style="thin", color="E5E7EB"),
-    right=Side(style="thin", color="E5E7EB"),
-    top=Side(style="thin", color="E5E7EB"),
-    bottom=Side(style="thin", color="E5E7EB"),
-)
-GREEN_FILL = PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid")
-RED_FILL = PatternFill(start_color="FECACA", end_color="FECACA", fill_type="solid")
-YELLOW_FILL = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
-ALT_ROW_FILL = PatternFill(start_color="F3F4F6", end_color="F3F4F6", fill_type="solid")
 
 # Campos a comparar (clave interna -> nombre legible)
 COMPARE_FIELDS = [
@@ -381,9 +360,41 @@ def _normalize_for_comparison(value: str, field_name: str) -> str:
         return _normalize_date(value)
     elif field_name == "sexo":
         return _normalize_sex(value)
+    elif field_name == "tipo_documento":
+        return _normalize_doc_type(value)
     else:
         # Quitar acentos para comparación tolerante
         return _remove_accents(value)
+
+def _normalize_doc_type(doc_type: str) -> str:
+    """
+    Normaliza el tipo de documento agrupando sinónimos.
+    """
+    doc_type = _remove_accents(doc_type.strip().lower())
+    
+    # Agrupar por cédula de ciudadanía
+    if doc_type in ("cc", "cedula", "cedula de ciudadania", "c.c.", "c.c"):
+        return "CC"
+    # Agrupar por tarjeta de identidad
+    elif doc_type in ("ti", "tarjeta de identidad", "t.i.", "t.i"):
+        return "TI"
+    # Agrupar por cédula de extranjería
+    elif doc_type in ("ce", "cedula de extranjeria", "c.e.", "c.e"):
+        return "CE"
+    # Agrupar por registro civil
+    elif doc_type in ("rc", "registro civil", "r.c.", "r.c"):
+        return "RC"
+    # Agrupar por PEP
+    elif doc_type in ("pep", "permiso especial de permanencia"):
+        return "PEP"
+    # Agrupar por PPT
+    elif doc_type in ("ppt", "permiso de proteccion temporal"):
+        return "PPT"
+    # Agrupar por pasaporte
+    elif doc_type in ("pa", "pasaporte"):
+        return "PA"
+        
+    return doc_type.upper()
 
 
 def _normalize_date(date_str: str) -> str:
@@ -492,14 +503,22 @@ def reconcile(file_a_data: List[Dict], file_b_data: List[Dict]) -> Reconciliatio
             document_number=record_a.get("numero_documento", doc_num)
         )
 
-        # Mostrar campo a campo para los emparejados, pero sin reportar inconsistencias
+        # Mostrar campo a campo para los emparejados, validando solo tipo_documento y numero
         for field_key, field_label in COMPARE_FIELDS:
             val_a = record_a.get(field_key, "")
             val_b = record_b.get(field_key, "")
 
-            # Dado que el usuario especificó que "desde que el numero coincida lo demas no genera inconsistencia",
-            # forzamos a que siempre se considere una coincidencia válida.
-            matches = True
+            if field_key == "tipo_documento":
+                norm_a = _normalize_for_comparison(val_a, field_key)
+                norm_b = _normalize_for_comparison(val_b, field_key)
+                matches = (norm_a == norm_b)
+                if not matches:
+                    comparison.all_match = False
+                    comparison.mismatches += 1
+            else:
+                # Dado que el usuario especificó que para los demás campos no genera inconsistencia,
+                # forzamos a que siempre se considere una coincidencia válida.
+                matches = True
 
             comparison.fields.append(FieldComparison(
                 field_name=field_label,
@@ -553,213 +572,3 @@ def reconcile(file_a_data: List[Dict], file_b_data: List[Dict]) -> Reconciliatio
     }
 
     return result
-
-
-def create_reconciliation_excel(result: ReconciliationResult) -> io.BytesIO:
-    """
-    Genera un Excel con el reporte de reconciliación.
-
-    Generates an Excel with the reconciliation report.
-    """
-    output = io.BytesIO()
-
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        _write_reconciliation_sheet(writer, result)
-        _write_only_in_sheet(writer, result.only_in_a, "Solo en Archivo 1", "🔴")
-        _write_only_in_sheet(writer, result.only_in_b, "Solo en Archivo 2", "🔵")
-        _write_summary_sheet(writer, result)
-
-    output.seek(0)
-    return output
-
-
-def _write_reconciliation_sheet(writer, result: ReconciliationResult):
-    """
-    Escribe la hoja de conciliación con comparación campo a campo.
-
-    Writes the reconciliation sheet with field-by-field comparison.
-    """
-    rows = []
-    row_num = 0
-
-    for comparison in result.matched:
-        row_num += 1
-        for fc in comparison.fields:
-            rows.append([
-                row_num,
-                comparison.document_number,
-                fc.field_name,
-                fc.value_a or "(vacío)",
-                fc.value_b or "(vacío)",
-                "✅ Coincide" if fc.matches else "❌ Difiere",
-            ])
-
-    if not rows:
-        rows = [["", "", "", "", "", "Sin datos para comparar"]]
-
-    columns = ["No.", "Cédula", "Campo", "Archivo A", "Archivo B", "Estado"]
-    df = pd.DataFrame(rows, columns=columns)
-    df.to_excel(writer, index=False, sheet_name="Conciliación")
-
-    ws = writer.sheets["Conciliación"]
-
-    # Encabezados
-    for col in range(1, len(columns) + 1):
-        cell = ws.cell(row=1, column=col)
-        cell.fill = HEADER_FILL
-        cell.font = HEADER_FONT
-        cell.alignment = CENTER_ALIGN
-
-    # Formato de datos
-    for row_idx in range(2, len(rows) + 2):
-        status_cell = ws.cell(row=row_idx, column=6)
-        status_val = str(status_cell.value or "")
-
-        for col_idx in range(1, len(columns) + 1):
-            cell = ws.cell(row=row_idx, column=col_idx)
-            cell.font = NORMAL_FONT
-            cell.border = THIN_BORDER
-            cell.alignment = LEFT_ALIGN
-
-            if "Difiere" in status_val:
-                # Fila con discrepancia: rojo suave
-                if col_idx in (4, 5):  # Columnas de valores
-                    cell.fill = RED_FILL
-            elif "Coincide" in status_val:
-                if col_idx == 6:
-                    cell.fill = GREEN_FILL
-
-        status_cell.alignment = CENTER_ALIGN
-
-    # Anchos
-    widths = [6, 22, 22, 25, 25, 16]
-    for i, w in enumerate(widths):
-        ws.column_dimensions[get_column_letter(i + 1)].width = w
-
-    ws.auto_filter.ref = f"A1:{get_column_letter(len(columns))}{len(rows) + 1}"
-    ws.freeze_panes = "A2"
-
-
-def _write_only_in_sheet(writer, records: List[Dict], sheet_name: str, emoji: str):
-    """
-    Escribe la hoja de registros que solo están en un archivo.
-
-    Writes the sheet for records that are only in one file.
-    """
-    if not records:
-        return
-
-    display_cols = ["numero_documento", "nombres", "apellidos", "fecha_nacimiento", "sexo", "nacionalidad"]
-    col_labels = ["Número de Documento", "Nombres", "Apellidos", "Fecha de Nacimiento", "Sexo", "Nacionalidad"]
-
-    rows = []
-    for record in records:
-        rows.append([record.get(c, "") for c in display_cols])
-
-    df = pd.DataFrame(rows, columns=col_labels)
-    df.to_excel(writer, index=False, sheet_name=sheet_name)
-
-    ws = writer.sheets[sheet_name]
-
-    for col in range(1, len(col_labels) + 1):
-        cell = ws.cell(row=1, column=col)
-        cell.fill = PatternFill(start_color="DC2626", end_color="DC2626", fill_type="solid")
-        cell.font = HEADER_FONT
-        cell.alignment = CENTER_ALIGN
-
-    for row_idx in range(2, len(rows) + 2):
-        for col_idx in range(1, len(col_labels) + 1):
-            cell = ws.cell(row=row_idx, column=col_idx)
-            cell.font = NORMAL_FONT
-            cell.border = THIN_BORDER
-            cell.alignment = LEFT_ALIGN
-            if row_idx % 2 == 0:
-                cell.fill = ALT_ROW_FILL
-
-    widths = [22, 25, 25, 18, 8, 16]
-    for i, w in enumerate(widths):
-        ws.column_dimensions[get_column_letter(i + 1)].width = w
-
-    ws.freeze_panes = "A2"
-
-
-def _write_summary_sheet(writer, result: ReconciliationResult):
-    """
-    Escribe la hoja de resumen con estadísticas.
-
-    Writes the summary sheet with statistics.
-    """
-    ws = writer.book.create_sheet("Resumen")
-    stats = result.stats
-
-    # Título
-    total_issues = stats["only_in_a"] + stats["only_in_b"]
-    title = "✅ Todas las cédulas coinciden — Ambos archivos son consistentes" if stats["all_clear"] \
-        else f"⚠️ {total_issues} cédula(s) no coinciden entre los archivos"
-    ws.cell(row=1, column=1, value="Resumen de Conciliación")
-    ws.cell(row=1, column=1).font = TITLE_FONT
-
-    ws.cell(row=2, column=1, value=title)
-    ws.cell(row=2, column=1).font = BOLD_FONT
-    if stats["all_clear"]:
-        ws.cell(row=2, column=1).fill = GREEN_FILL
-    else:
-        ws.cell(row=2, column=1).fill = YELLOW_FILL
-
-    # Métricas generales
-    ws.cell(row=4, column=1, value="Métricas Generales")
-    ws.cell(row=4, column=1).font = BOLD_FONT
-
-    metrics = [
-        ("Total registros Archivo 1", stats["total_records_a"]),
-        ("Total registros Archivo 2", stats["total_records_b"]),
-        ("Cédulas únicas Archivo 1", stats.get("cedulas_archivo_1", "—")),
-        ("Cédulas únicas Archivo 2", stats.get("cedulas_archivo_2", "—")),
-        ("Cédulas emparejadas (en ambos)", stats["matched_pairs"]),
-        ("Cédulas solo en Archivo 1", stats["only_in_a"]),
-        ("Cédulas solo en Archivo 2", stats["only_in_b"]),
-        ("Registros con diferencias de datos", stats["records_with_mismatches"]),
-    ]
-
-    for i, (label, value) in enumerate(metrics):
-        row = 5 + i
-        ws.cell(row=row, column=1, value=label).font = NORMAL_FONT
-        ws.cell(row=row, column=1).border = THIN_BORDER
-        cell_val = ws.cell(row=row, column=2, value=value)
-        cell_val.font = BOLD_FONT
-        cell_val.border = THIN_BORDER
-        cell_val.alignment = CENTER_ALIGN
-
-        # Colorear cédulas sin par en rojo
-        if "solo en" in label.lower() and isinstance(value, int) and value > 0:
-            cell_val.fill = RED_FILL
-        elif "emparejadas" in label.lower() and isinstance(value, int) and value > 0:
-            cell_val.fill = GREEN_FILL
-
-    # Desglose por campo (solo si hay emparejados)
-    start_row = 5 + len(metrics) + 2
-    ws.cell(row=start_row, column=1, value="Discrepancias por Campo (registros emparejados)")
-    ws.cell(row=start_row, column=1).font = BOLD_FONT
-
-    headers = ["Campo", "Discrepancias"]
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=start_row + 1, column=col, value=header)
-        cell.fill = HEADER_FILL
-        cell.font = HEADER_FONT
-        cell.alignment = CENTER_ALIGN
-
-    row = start_row + 2
-    for field_key, field_label in COMPARE_FIELDS:
-        mismatches = stats["field_mismatch_counts"].get(field_key, 0)
-        ws.cell(row=row, column=1, value=field_label).font = NORMAL_FONT
-        ws.cell(row=row, column=1).border = THIN_BORDER
-        cell_val = ws.cell(row=row, column=2, value=mismatches)
-        cell_val.font = NORMAL_FONT
-        cell_val.border = THIN_BORDER
-        cell_val.alignment = CENTER_ALIGN
-        cell_val.fill = RED_FILL if mismatches > 0 else GREEN_FILL
-        row += 1
-
-    # Anchos
-    ws.column_dimensions["A"].width = 42
-    ws.column_dimensions["B"].width = 14

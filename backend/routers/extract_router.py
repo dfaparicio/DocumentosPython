@@ -8,8 +8,10 @@ Uses concurrent batch processing for maximum speed.
 
 import asyncio
 import logging
-from fastapi import APIRouter, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import StreamingResponse
+
+from core.auth_middleware import require_active_user
 
 from services.pdf_service import convert_pdf_to_images
 from services.excel_service import create_excel_with_merged_documents
@@ -17,8 +19,7 @@ from services.batch_processor import (
     process_pages_batch,
     group_pages_into_documents,
     generate_problem_report,
-    ProcessingProgress,
-    clear_cache
+    ProcessingProgress
 )
 
 logger = logging.getLogger(__name__)
@@ -71,7 +72,10 @@ def _enrich_documents_with_page_info(documents, page_results):
 
 
 @router.post("/")
-async def extract_from_pdf(pdf_file: UploadFile = File(...)):
+async def extract_from_pdf(
+    pdf_file: UploadFile = File(...),
+    user: dict = Depends(require_active_user)
+):
     """
     Endpoint principal: recibe un PDF de documentos colombianos y devuelve un Excel.
 
@@ -202,7 +206,7 @@ async def extract_from_pdf(pdf_file: UploadFile = File(...)):
 
 
 @router.get("/progress")
-async def get_progress():
+async def get_progress(user: dict = Depends(require_active_user)):
     """
     Endpoint para consultar el progreso del procesamiento actual.
 
@@ -226,7 +230,10 @@ async def get_progress():
 
 
 @router.websocket("/ws/progress")
-async def websocket_progress(websocket: WebSocket):
+async def websocket_progress(
+    websocket: WebSocket,
+    user: dict = Depends(require_active_user)
+):
     """
     WebSocket para progreso en tiempo real.
     El frontend puede conectarse aquí para ver el avance.
@@ -263,13 +270,3 @@ async def websocket_progress(websocket: WebSocket):
         logger.debug("WebSocket de progreso desconectado")
     except Exception as e:
         logger.error(f"Error en WebSocket de progreso: {e}")
-
-
-@router.post("/clear-cache")
-async def clear_extraction_cache():
-    """Limpia el caché de resultados de extracción.
-
-    Clears the extraction results cache.
-    """
-    clear_cache()
-    return {"message": "Caché limpiado exitosamente"}

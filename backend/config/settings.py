@@ -79,6 +79,86 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", env="LOG_LEVEL", description="Nivel de logging")
     log_dir: str = Field(default="logs", env="LOG_DIR", description="Directorio de logs")
 
+    # Configuración de MongoDB
+    # MongoDB configuration
+    mongodb_url: str = Field(
+        default="mongodb://localhost:27017",
+        env="MONGODB_URL",
+        description="URL de conexión a MongoDB"
+    )
+    mongodb_db_name: str = Field(
+        default="cedulas_extractor",
+        env="MONGODB_DB_NAME",
+        description="Nombre de la base de datos MongoDB"
+    )
+
+    # Configuración de JWT
+    # JWT configuration
+    jwt_secret_key: str = Field(
+        default="tu-clave-secreta-cambiar-en-produccion",
+        env="JWT_SECRET_KEY",
+        description="Clave secreta para firmar tokens JWT"
+    )
+    jwt_algorithm: str = Field(
+        default="HS256",
+        env="JWT_ALGORITHM",
+        description="Algoritmo de firmado JWT"
+    )
+    jwt_expire_minutes: int = Field(
+        default=60,
+        env="JWT_EXPIRE_MINUTES",
+        description="Minutos de expiración del token JWT"
+    )
+
+    # Usuario admin por defecto
+    # Default admin user
+    admin_email: str = Field(
+        default="admin@sistema.com",
+        env="ADMIN_EMAIL",
+        description="Email del usuario admin por defecto"
+    )
+    admin_password: str = Field(
+        default="admin123",
+        env="ADMIN_PASSWORD",
+        description="Contraseña del usuario admin por defecto"
+    )
+
+    # Configuración SMTP (Gmail)
+    # SMTP configuration (Gmail)
+    smtp_host: str = Field(
+        default="smtp.gmail.com",
+        env="SMTP_HOST",
+        description="Host del servidor SMTP"
+    )
+    smtp_port: int = Field(
+        default=587,
+        env="SMTP_PORT",
+        description="Puerto del servidor SMTP"
+    )
+    smtp_user: str = Field(
+        default="",
+        env="SMTP_USER",
+        description="Email de la cuenta Gmail remitente"
+    )
+    smtp_password: str = Field(
+        default="",
+        env="SMTP_PASSWORD",
+        description="Contraseña de aplicación Gmail"
+    )
+    smtp_from_name: str = Field(
+        default="Sistema Cédulas",
+        env="SMTP_FROM_NAME",
+        description="Nombre visible del remitente"
+    )
+
+    # Configuración de código de recuperación
+    # Reset code configuration
+    reset_code_expire_minutes: int = Field(
+        default=10,
+        env="RESET_CODE_EXPIRE_MINUTES",
+        description="Minutos de expiración del código de recuperación"
+    )
+
     # Validar niveles de logging válidos
     # Validate valid logging levels
     @validator("log_level")

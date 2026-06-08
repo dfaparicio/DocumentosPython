@@ -33,3 +33,11 @@ cachetools==5.5.0
 
 # WebSocket para progreso en tiempo real
 websockets==14.0
+
+# Base de datos — MongoDB async driver
+motor==3.7.0
+
+# Autenticación — Hash de contraseñas y JWT
+bcrypt==4.2.1
+python-jose[cryptography]==3.5.0
+email-validator==2.2.0

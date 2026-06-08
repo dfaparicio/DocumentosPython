@@ -44,29 +44,7 @@ export function useComparison() {
     }
   }
 
-  /**
-   * Descarga el reporte Excel a partir del report_id.
-   */
-  const downloadReport = () => {
-    const result = store.reconciliationResult
-    if (!result || !result.report_id) return
-
-    const url = `${API_URL}/compare/download/${result.report_id}`
-    window.open(url, '_blank')
-  }
-
   // === Utilidades privadas ===
-
-  function _downloadBlob(blob, fileName) {
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = fileName
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
-  }
 
   function _extractErrorMessage(err) {
     if (err.response) {
@@ -80,6 +58,5 @@ export function useComparison() {
 
   return {
     reconcileFiles,
-    downloadReport,
   }
 }

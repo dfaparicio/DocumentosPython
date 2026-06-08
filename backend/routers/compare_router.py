@@ -1,64 +1,42 @@
 """
 Router para comparación y reconciliación de archivos Excel.
-Permite mezclar un Excel y comparar dos archivos buscando inconsistencias.
+Compara dos archivos buscando inconsistencias y guarda el reporte en MongoDB.
 
 Router for comparison and reconciliation of Excel files.
-Allows shuffling an Excel and comparing two files for inconsistencies.
+Compares two files for inconsistencies and saves the report to MongoDB.
 """
 
-import uuid
-import time
 import logging
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from fastapi.responses import StreamingResponse
+from datetime import datetime
 
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+
+from core.auth_middleware import require_active_user
+from infrastructure.storage.database import get_database
 from services.compare_service import (
     parse_excel_for_comparison,
     reconcile,
-    create_reconciliation_excel,
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/compare", tags=["comparación"])
 
-# Cache temporal de reportes generados con TTL
-# Temporary cache of generated reports with TTL
-_CACHE_MAX_SIZE = 50
-_CACHE_TTL_SECONDS = 30 * 60  # 30 minutos
-
-# Cada entrada: { "data": bytes, "created_at": timestamp }
-_report_cache: dict = {}
-
-
-def _cleanup_cache():
-    """Elimina entradas expiradas y limita el tamaño del cache."""
-    now = time.time()
-    # Eliminar expiradas
-    expired = [k for k, v in _report_cache.items() if now - v["created_at"] > _CACHE_TTL_SECONDS]
-    for k in expired:
-        del _report_cache[k]
-    # Si aún excede el límite, eliminar las más antiguas
-    if len(_report_cache) > _CACHE_MAX_SIZE:
-        sorted_keys = sorted(_report_cache, key=lambda k: _report_cache[k]["created_at"])
-        for k in sorted_keys[:len(_report_cache) - _CACHE_MAX_SIZE]:
-            del _report_cache[k]
-
-
 
 @router.post("/reconcile")
 async def reconcile_files(
     file_a: UploadFile = File(..., description="Primer archivo Excel"),
     file_b: UploadFile = File(..., description="Segundo archivo Excel"),
+    user: dict = Depends(require_active_user),
 ):
     """
     Compara dos archivos Excel buscando inconsistencias.
     Empareja por número de cédula y compara campo a campo.
-    Devuelve JSON con estadísticas y detalle de discrepancias.
+    Guarda el reporte en MongoDB y devuelve JSON con estadísticas y detalle de discrepancias.
 
     Compares two Excel files for inconsistencies.
     Matches by document number and compares field by field.
-    Returns JSON with statistics and discrepancy details.
+    Saves the report to MongoDB and returns JSON with statistics and discrepancy details.
     """
     for f in [file_a, file_b]:
         if not f.filename.lower().endswith(('.xlsx', '.xls')):
@@ -84,18 +62,6 @@ async def reconcile_files(
 
         # Reconciliar
         result = reconcile(data_a, data_b)
-
-        # Generar Excel y guardarlo en cache
-        output = create_reconciliation_excel(result)
-        report_id = str(uuid.uuid4())[:8]
-        output.seek(0)
-        _cleanup_cache()
-        _report_cache[report_id] = {"data": output.read(), "created_at": time.time()}
-
-        logger.info(
-            f"Resultado: {result.stats['matched_pairs']} pares coincidentes, "
-            f"{result.stats['only_in_a']} solo en 1, {result.stats['only_in_b']} solo en 2, report_id={report_id}"
-        )
 
         # Construir respuesta JSON con todo el detalle
         discrepancies = []
@@ -133,30 +99,54 @@ async def reconcile_files(
             for r in result.only_in_b
         ]
 
+        stats = {
+            "total_registros_1": result.stats["total_records_a"],
+            "total_registros_2": result.stats["total_records_b"],
+            "cedulas_archivo_1": result.stats["cedulas_archivo_1"],
+            "cedulas_archivo_2": result.stats["cedulas_archivo_2"],
+            "emparejados": result.stats["matched_pairs"],
+            "solo_en_1": result.stats["only_in_a"],
+            "solo_en_2": result.stats["only_in_b"],
+            "registros_con_diferencias": result.stats["records_with_mismatches"],
+            "discrepancias_por_campo": {
+                label: result.stats["field_mismatch_counts"].get(key, 0)
+                for key, label in [
+                    ("tipo_documento", "Tipo de Documento"),
+                    ("nombres", "Nombres"),
+                    ("apellidos", "Apellidos"),
+                    ("fecha_nacimiento", "Fecha de Nacimiento"),
+                    ("sexo", "Sexo"),
+                    ("nacionalidad", "Nacionalidad"),
+                ]
+            },
+        }
+
+        # Guardar reporte en MongoDB (colección "reports")
+        db = get_database()
+        report_doc = {
+            "user_email": user["email"],
+            "created_at": datetime.utcnow(),
+            "file_a_name": file_a.filename,
+            "file_b_name": file_b.filename,
+            "all_clear": result.stats["all_clear"],
+            "stats": stats,
+            "discrepancias": discrepancies,
+            "solo_en_1_detalle": only_in_a,
+            "solo_en_2_detalle": only_in_b,
+        }
+        insert_result = await db["reports"].insert_one(report_doc)
+        report_id = str(insert_result.inserted_id)
+
+        logger.info(
+            f"Resultado: {result.stats['matched_pairs']} pares coincidentes, "
+            f"{result.stats['only_in_a']} solo en 1, {result.stats['only_in_b']} solo en 2, "
+            f"report_id={report_id}"
+        )
+
         return {
             "report_id": report_id,
             "all_clear": result.stats["all_clear"],
-            "stats": {
-                "total_registros_1": result.stats["total_records_a"],
-                "total_registros_2": result.stats["total_records_b"],
-                "cedulas_archivo_1": result.stats["cedulas_archivo_1"],
-                "cedulas_archivo_2": result.stats["cedulas_archivo_2"],
-                "emparejados": result.stats["matched_pairs"],
-                "solo_en_1": result.stats["only_in_a"],
-                "solo_en_2": result.stats["only_in_b"],
-                "registros_con_diferencias": result.stats["records_with_mismatches"],
-                "discrepancias_por_campo": {
-                    label: result.stats["field_mismatch_counts"].get(key, 0)
-                    for key, label in [
-                        ("tipo_documento", "Tipo de Documento"),
-                        ("nombres", "Nombres"),
-                        ("apellidos", "Apellidos"),
-                        ("fecha_nacimiento", "Fecha de Nacimiento"),
-                        ("sexo", "Sexo"),
-                        ("nacionalidad", "Nacionalidad"),
-                    ]
-                },
-            },
+            "stats": stats,
             "discrepancias": discrepancies,
             "solo_en_1_detalle": only_in_a,
             "solo_en_2_detalle": only_in_b,
@@ -173,26 +163,3 @@ async def reconcile_files(
             status_code=500,
             detail=f"Error al comparar los archivos: {str(e)}"
         )
-
-
-@router.get("/download/{report_id}")
-async def download_report(report_id: str):
-    """
-    Descarga el Excel de conciliación generado previamente.
-
-    Downloads the previously generated reconciliation Excel.
-    """
-    _cleanup_cache()
-    if report_id not in _report_cache:
-        raise HTTPException(status_code=404, detail="Reporte no encontrado o expirado. Realiza una nueva comparación.")
-
-    from io import BytesIO
-    excel_bytes = _report_cache[report_id]["data"]
-
-    return StreamingResponse(
-        BytesIO(excel_bytes),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={
-            "Content-Disposition": "attachment; filename=conciliacion_reporte.xlsx"
-        }
-    )
